@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+handoff/
+handoff-*.zip
+.env
+.DS_Store
