@@ -1,5 +1,5 @@
 ---
-name: harmony-ux-guide
+name: project-handoff
 description: "Generate complete project handoff documentation: architecture overview, deployment guides (Docker/Cloudflare/CI/K8s), environment variables, AI API usage, database, known issues, and operational runbooks. Use when delivering a project to a client, transitioning a codebase between teams or AI agents, onboarding maintainers, or packaging a project for long-term maintenance."
 ---
 
