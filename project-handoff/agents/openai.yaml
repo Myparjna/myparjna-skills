@@ -1,7 +1,0 @@
-interface:
-  display_name: "Project Handoff"
-  short_description: "Generate delivery and transition documentation."
-  default_prompt: "Use $project-handoff to generate a handoff package for this project."
-
-policy:
-  allow_implicit_invocation: true

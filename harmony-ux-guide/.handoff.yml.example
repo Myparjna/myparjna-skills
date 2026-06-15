@@ -1,0 +1,10 @@
+# .handoff.yml — project-handoff 技能配置文件（可选）
+# 将此文件复制为 .handoff.yml 并按需修改
+# 注意：当前解析器仅支持单行格式，不支持多行数组
+
+# 追加到默认跳过目录（默认已包含 node_modules, .git, dist, build 等）
+# 格式：["dir1", "dir2", "dir3"]
+# skip_dirs: ["testdata", "fixtures", "e2e"]
+
+# 最大扫描文件数（默认 3000）
+# max_files: 5000
