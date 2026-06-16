@@ -823,7 +823,8 @@ def detect_monitoring(node_deps, py_deps):
 def git_info():
     def run(args):
         try:
-            return subprocess.run(["git", *args], capture_output=True, text=True, timeout=10).stdout.strip()
+            r = subprocess.run(["git", *args], capture_output=True, timeout=10)
+            return r.stdout.decode("utf-8", errors="replace").strip()
         except (OSError, subprocess.SubprocessError):
             return ""
     return {
