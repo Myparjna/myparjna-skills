@@ -5,3 +5,6 @@ handoff/
 handoff-*.zip
 .env
 .DS_Store
+.omc/
+.claude/
+*.jsonl
