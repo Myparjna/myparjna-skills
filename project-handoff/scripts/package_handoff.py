@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 ROOT = Path.cwd()
-HANDOFF = ROOT / "handoff"
+HANDOFF = ROOT / "ProjectDoc"
 VERIFY_SCRIPT = Path(__file__).parent / "verify_handoff.py"
 
 
@@ -20,9 +20,9 @@ def run_verify() -> int:
 
 
 def package() -> None:
-    """将 handoff/ 打成 ZIP，排除 analysis-report.json 和 ZIP 自身。"""
+    """将 ProjectDoc/ 打成 ZIP，排除 analysis-report.json 和 ZIP 自身。"""
     if not HANDOFF.is_dir():
-        sys.exit("ERROR: handoff/ 目录不存在，先运行 generate_handoff.py")
+        sys.exit("ERROR: ProjectDoc/ 目录不存在，先运行 generate_handoff.py")
 
     # 创建临时打包目录
     staging = HANDOFF / "_staging"
@@ -36,7 +36,7 @@ def package() -> None:
             shutil.copy2(md_file, staging / md_file.name)
 
         # 打包
-        zip_path = HANDOFF / "handoff-package"
+        zip_path = HANDOFF / "ProjectDoc-package"
         archive = shutil.make_archive(str(zip_path), "zip", staging)
         print(f"\n打包完成: {archive}")
         print(f"包含 {len(list(staging.glob('*.md')))} 份文档")
@@ -73,7 +73,7 @@ def main():
     package()
 
     print("\n" + "=" * 50)
-    print("打包完成。可将 handoff-package.zip 交付给接手方。")
+    print("打包完成。可将 ProjectDoc-package.zip 交付给接手方。")
     print("=" * 50)
 
 

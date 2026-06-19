@@ -11,8 +11,7 @@
 | `amap-jsapi-skill` | 高德地图 JS API v2.0 开发集成指南 | ~92 KB |
 | `amap-lbs-skill` | 高德地图 LBS 综合服务（POI/路径/热力图） | ~50 KB |
 | `amap-cli-skill` | 高德地图 CLI 操控工具 | ~23 KB |
-| `harmony-ux-check` | 鸿蒙 UX 设计规范检查 | ~500 KB |
-| `华为体验手册skill_extracted` | 华为完整体验设计手册（比 harmony-ux-check 更全） | ~800 KB |
+| `华为体验手册skill_extracted` | 华为完整体验设计手册，主技能名为 `harmony-os-ux-guide` | ~800 KB |
 | `modelscope-search` | 魔搭社区 ModelScope 模型搜索（200K+ 模型） | ~5 KB |
 | `see-tools` | S.EE 短网址 / 文本分享 / 图床工具 | ~5 KB |
 | `skillsmp-search` | SkillsMP 技能市场搜索 | ~5 KB |

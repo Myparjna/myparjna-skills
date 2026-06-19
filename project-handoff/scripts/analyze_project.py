@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scan the project and emit handoff/analysis-report.json for handoff doc generation."""
+"""Scan the project and emit ProjectDoc/analysis-report.json for handoff doc generation."""
 from pathlib import Path
 from datetime import datetime, timezone
 import json
@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 ROOT = Path.cwd()
-OUT_DIR = ROOT / "handoff"
+OUT_DIR = ROOT / "ProjectDoc"
 TOOL_VERSION = "2.0.0"
 SCHEMA_VERSION = 2
 
@@ -17,12 +17,21 @@ SCHEMA_VERSION = 2
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", "out",
     "__pycache__", ".venv", "venv", "env", ".turbo", "coverage", ".cache",
-    "target", "vendor", ".pytest_cache", ".mypy_cache", "handoff",
+    "target", "vendor", ".pytest_cache", ".mypy_cache", "ProjectDoc",
     ".mypy_cache", ".ruff_cache", ".tox", "egg-info",
 }
 GREP_EXT = {".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".py", ".html",
              ".cjs", ".mjs", ".md", ".toml", ".yml", ".yaml", ".json",
-             ".go", ".rs", ".rb", ".java", ".kt", ".swift", ".cs", ".php"}
+             ".go", ".rs", ".rb", ".java", ".kt", ".swift", ".cs", ".php",
+             ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
+             ".ino", ".S", ".s", ".cmake", ".mk", ".gradle", ".properties",
+             ".xml", ".ld", ".lds"}
+GREP_FILENAMES = {
+    "Makefile", "makefile", "GNUmakefile", "CMakeLists.txt", "meson.build",
+    "platformio.ini", "go.mod", "go.sum", "Cargo.toml", "Cargo.lock",
+    "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
+    "settings.gradle.kts", "requirements.txt", "pyproject.toml",
+}
 MAX_FILE_SIZE = 512_000
 MAX_GREP_FILES = 3000
 
@@ -62,6 +71,18 @@ def read_text(path: Path) -> str:
         return ""
 
 
+def scanner_relative_prefix():
+    """Return scanner script path relative to ROOT when the skill is vendored into the project."""
+    try:
+        return str(Path(__file__).parent.resolve().relative_to(ROOT.resolve())).replace("\\", "/")
+    except ValueError:
+        return None
+
+
+def rel_path(path: Path) -> str:
+    return str(path.relative_to(ROOT)).replace("\\", "/")
+
+
 def iter_files():
     stack = [ROOT]
     count = 0
@@ -88,10 +109,10 @@ def collect_source_texts():
     """(relative_path, content) pairs for grep-based detection."""
     texts = []
     for path in iter_files():
-        if path.suffix.lower() in GREP_EXT:
+        if path.suffix.lower() in GREP_EXT or path.name in GREP_FILENAMES:
             content = read_text(path)
             if content:
-                texts.append((str(path.relative_to(ROOT)), content))
+                texts.append((rel_path(path), content))
             if len(texts) >= MAX_GREP_FILES:
                 break
     return texts
@@ -110,9 +131,18 @@ def grep(texts, pattern, group=0):
 # ---------- manifests ----------
 
 def find_manifests():
-    manifests = {"package_json": [], "requirements": [], "pyproject": [], "csproj": []}
+    manifests = {
+        "package_json": [], "requirements": [], "pyproject": [], "csproj": [],
+        "go_mod": [], "cargo": [], "java": [], "native": [], "embedded": [],
+    }
     for pattern, key in [("package.json", "package_json"), ("requirements*.txt", "requirements"),
-                         ("pyproject.toml", "pyproject"), ("*.csproj", "csproj")]:
+                         ("pyproject.toml", "pyproject"), ("*.csproj", "csproj"),
+                         ("go.mod", "go_mod"), ("Cargo.toml", "cargo"),
+                         ("pom.xml", "java"), ("build.gradle*", "java"),
+                         ("CMakeLists.txt", "native"), ("Makefile", "native"),
+                         ("*.mk", "native"), ("meson.build", "native"),
+                         ("platformio.ini", "embedded"), ("*.ioc", "embedded"),
+                         ("*.uvprojx", "embedded"), ("*.ewp", "embedded")]:
         for depth in ("", "*/", "*/*/"):
             for path in ROOT.glob(depth + pattern):
                 if not any(part in SKIP_DIRS for part in path.parts):
@@ -128,7 +158,7 @@ def load_node_deps(package_json_paths):
             data = json.loads(read_text(path) or "{}")
         except json.JSONDecodeError:
             continue
-        rel = str(path.relative_to(ROOT))
+        rel = rel_path(path)
         for key in ("dependencies", "devDependencies"):
             for name, version in (data.get(key) or {}).items():
                 all_deps[name] = {"version": version, "dev": key == "devDependencies", "manifest": rel}
@@ -145,12 +175,12 @@ def load_python_deps(req_paths, pyproject_paths):
             if line and not line.startswith(("#", "-")):
                 name = re.split(r"[=<>!~\[ ]", line)[0].lower()
                 if name:
-                    deps[name] = {"spec": line, "manifest": str(path.relative_to(ROOT))}
+                    deps[name] = {"spec": line, "manifest": rel_path(path)}
     for path in pyproject_paths:
         content = read_text(path)
         for match in re.finditer(r'^\s*"?([A-Za-z0-9_.-]+)\s*[=<>!~"]', content, re.MULTILINE):
             pass  # pyproject parsing kept minimal; requirements cover most cases
-        deps.setdefault("__pyproject__", {"spec": "see file", "manifest": str(path.relative_to(ROOT))})
+        deps.setdefault("__pyproject__", {"spec": "see file", "manifest": rel_path(path)})
     return deps
 
 
@@ -267,7 +297,7 @@ def detect_desktop(node_deps, csproj_paths):
         desktop.append({"type": "Tauri", "config": "src-tauri/tauri.conf.json"})
     for path in csproj_paths:
         content = read_text(path)
-        rel = str(path.relative_to(ROOT))
+        rel = rel_path(path)
         if "Microsoft.WindowsAppSDK" in content or "<UseWinUI>" in content:
             desktop.append({"type": "WinUI 3", "project": rel})
         elif "<UseWPF>true" in content:
@@ -283,7 +313,7 @@ def detect_docker():
     if dockerfile:
         content = read_text(dockerfile)
         result["dockerfile"] = {
-            "path": str(dockerfile.relative_to(ROOT)),
+            "path": rel_path(dockerfile),
             "base_images": re.findall(r"^FROM\s+(\S+)", content, re.MULTILINE),
             "exposed_ports": re.findall(r"^EXPOSE\s+(.+)", content, re.MULTILINE),
             "cmd": re.findall(r"^(?:CMD|ENTRYPOINT)\s+(.+)", content, re.MULTILINE),
@@ -411,7 +441,7 @@ def detect_kubernetes():
                            "StatefulSet", "DaemonSet", "Job", "CronJob", "PersistentVolumeClaim"):
                     result["resources"].append({
                         "kind": kind,
-                        "file": str(path.relative_to(ROOT)),
+                        "file": rel_path(path),
                         "name": (re.search(r"^\s*name:\s*(\S+)", content, re.MULTILINE) or [None, ""])[1],
                     })
         # 提取容器镜像
@@ -484,7 +514,7 @@ def detect_high_entropy_env_values():
     high_entropy = []
     # 动态发现所有 .env 变体文件
     env_files = sorted(set(
-        str(p.relative_to(ROOT)) for p in ROOT.glob(".env*")
+        rel_path(p) for p in ROOT.glob(".env*")
         if p.is_file() and p.name != ".env.example" and not p.name.startswith(".env.")
         or p.name in (".env.local", ".env.development", ".env.staging",
                        ".env.test", ".env.production", ".env.backup")
@@ -529,25 +559,45 @@ def detect_env_vars(texts):
                     declared[key] = {"source": name,
                                      "default": value.strip() if name != ".env" else "<redacted: real .env>"}
     used = set()
-    patterns = [r"process\.env\.([A-Z0-9_]+)", r"process\.env\[['\"]([A-Z0-9_]+)",
-                r"import\.meta\.env\.([A-Z0-9_]+)",
-                r"os\.environ(?:\.get)?\(\s*['\"]([A-Z0-9_]+)", r"os\.environ\[['\"]([A-Z0-9_]+)",
-                r"os\.getenv\(\s*['\"]([A-Z0-9_]+)",
-                # C# patterns
-                r"Environment\.GetEnvironmentVariable\(\s*['\"]([A-Z0-9_]+)",
-                r'Configuration\[[\'"]([A-Z0-9_]+)',
-                # Go patterns
-                r"os\.Getenv\(\s*['\"]([A-Z0-9_]+)",
-                r"os\.LookupEnv\(\s*['\"]([A-Z0-9_]+)",
-                # PHP patterns
-                r"\$_ENV\[['\"]([A-Z0-9_]+)",
-                r"getenv\(\s*['\"]([A-Z0-9_]+)",
-                # Shell/Docker patterns
-                r"\$\{?([A-Z][A-Z0-9_]+)\}?",
-                ]
+    precise_patterns = [
+        # JS / TS / Vite / Node
+        r"process\.env\.([A-Z0-9_]+)",
+        r"process\.env\[['\"]([A-Z0-9_]+)",
+        r"import\.meta\.env\.([A-Z0-9_]+)",
+        # Python
+        r"os\.environ(?:\.get)?\(\s*['\"]([A-Z0-9_]+)",
+        r"os\.environ\[['\"]([A-Z0-9_]+)",
+        r"os\.getenv\(\s*['\"]([A-Z0-9_]+)",
+        # .NET
+        r"Environment\.GetEnvironmentVariable\(\s*['\"]([A-Z0-9_]+)",
+        r'Configuration\[[\'"]([A-Z0-9_]+)',
+        # Go
+        r"os\.Getenv\(\s*['\"]([A-Z0-9_]+)",
+        r"os\.LookupEnv\(\s*['\"]([A-Z0-9_]+)",
+        # Rust
+        r"std::env::var\(\s*['\"]([A-Z0-9_]+)",
+        r"env::var\(\s*['\"]([A-Z0-9_]+)",
+        # Java / Kotlin
+        r"System\.getenv\(\s*['\"]([A-Z0-9_]+)",
+        # C / C++ / PHP
+        r"\bgetenv\(\s*['\"]([A-Z0-9_]+)",
+        r"\$_ENV\[['\"]([A-Z0-9_]+)",
+    ]
+    shell_like_files = (
+        ".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd", ".env", ".yml", ".yaml",
+        "Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yml",
+        "compose.yaml", "Makefile", "makefile", "GNUmakefile", ".mk",
+    )
+    shell_patterns = [
+        r"\$\{([A-Z][A-Z0-9_]{2,})(?::-[^}]*)?\}",
+        r"(?<![A-Za-z0-9_])\$([A-Z][A-Z0-9_]{2,})(?![A-Za-z0-9_])",
+    ]
     for rel, content in texts:
-        for pattern in patterns:
+        for pattern in precise_patterns:
             used.update(re.findall(pattern, content))
+        if rel.endswith(shell_like_files) or Path(rel).name in shell_like_files:
+            for pattern in shell_patterns:
+                used.update(re.findall(pattern, content))
     declared_keys = set(declared)
     return {
         "declared": [{"name": k, **v} for k, v in sorted(declared.items())],
@@ -578,6 +628,95 @@ def detect_database(node_deps, py_deps):
             result["migrations"].append(name)
     result["clients"] = sorted(set(result["clients"]))
     return result
+
+
+def detect_native_embedded_ai(texts):
+    """检测 Go/Rust/Java/.NET/C/C++、嵌入式和本地推理项目线索。"""
+    def rel_paths(patterns, limit=20):
+        paths = []
+        for pattern in patterns:
+            for depth in ("", "*/", "*/*/"):
+                for path in ROOT.glob(depth + pattern):
+                    if path.is_file() and not any(part in SKIP_DIRS for part in path.parts):
+                        rel = rel_path(path)
+                        if rel not in paths:
+                            paths.append(rel)
+                            if len(paths) >= limit:
+                                return paths
+        return paths
+
+    manifests = {
+        "go": rel_paths(["go.mod", "go.sum"]),
+        "rust": rel_paths(["Cargo.toml", "Cargo.lock"]),
+        "java_jvm": rel_paths(["pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts"]),
+        "dotnet": rel_paths(["*.sln", "*.csproj", "*.fsproj", "*.vbproj"]),
+        "native_build": rel_paths(["CMakeLists.txt", "Makefile", "*.mk", "meson.build", "BUILD", "WORKSPACE"]),
+        "embedded": rel_paths(["platformio.ini", "*.ioc", "*.uvprojx", "*.ewp", "*.ld", "*.lds"]),
+    }
+
+    source_counts = {
+        "c": len(rel_paths(["*.c"], limit=2000)),
+        "cpp": len(rel_paths(["*.cc", "*.cpp", "*.cxx"], limit=2000)),
+        "headers": len(rel_paths(["*.h", "*.hpp", "*.hxx"], limit=2000)),
+        "asm": len(rel_paths(["*.S", "*.s"], limit=2000)),
+    }
+
+    compiler_patterns = {
+        "GCC": r"\b(?:gcc|g\+\+)\b",
+        "Clang": r"\b(?:clang|clang\+\+)\b",
+        "ARM GCC": r"\barm-none-eabi-(?:gcc|g\+\+)\b",
+        "RISC-V GCC": r"\briscv(?:32|64)-[^/\s]*(?:gcc|g\+\+)\b",
+        "CMake": r"\bcmake\b",
+        "Make/Ninja": r"\b(?:make|ninja)\b",
+        "MSVC": r"\b(?:cl\.exe|msbuild)\b",
+    }
+    embedded_patterns = {
+        "FreeRTOS": r"\bFreeRTOS\b",
+        "Zephyr": r"\bZephyr\b",
+        "ESP-IDF": r"\bESP-IDF\b|\bidf_component_register\b",
+        "STM32 HAL/Cube": r"\bSTM32\b|\bHAL_[A-Z][A-Za-z0-9_]+\b",
+        "CMSIS": r"\bCMSIS\b|arm_math\.h",
+        "Arduino": r"\bArduino\b|\.ino\b",
+        "RT-Thread": r"\bRT-Thread\b",
+    }
+    inference_patterns = {
+        "YOLO": r"\bYOLO(?:v\d+)?\b|\byolov\d+\b",
+        "ONNX Runtime": r"\bonnx\s*runtime\b|\bonnxruntime\b|Ort::|OrtApi",
+        "TensorRT": r"\bTensorRT\b|\bnvinfer\b|NvInfer",
+        "OpenVINO": r"\bOpenVINO\b|InferenceEngine",
+        "ncnn": r"\bncnn\b",
+        "MNN": r"\bMNN\b",
+        "TFLite": r"\bTFLite\b|tensorflow/lite|\.tflite\b",
+        "RKNN": r"\bRKNN\b|rknn_",
+        "OpenCV DNN": r"\bdnn::Net\b|readNetFrom",
+        "Darknet": r"\bdarknet\b|\.weights\b",
+        "TVM": r"\bTVM\b|tvm::",
+        "llama.cpp / ggml": r"\bggml\b|\bllama\.cpp\b",
+    }
+
+    def collect_hits(patterns, limit=20):
+        hits = []
+        for label, pattern in patterns.items():
+            regex = re.compile(pattern, re.IGNORECASE)
+            for rel, content in texts:
+                if regex.search(content):
+                    hits.append({"name": label, "found_in": rel})
+                    break
+            if len(hits) >= limit:
+                break
+        return hits
+
+    model_files = rel_paths(["*.onnx", "*.engine", "*.plan", "*.trt", "*.rknn", "*.tflite",
+                             "*.mnn", "*.param", "*.bin", "*.weights", "*.pt", "*.pth"], limit=40)
+
+    return {
+        "manifests": manifests,
+        "source_counts": source_counts,
+        "compilers_and_build_tools": collect_hits(compiler_patterns),
+        "embedded_signals": collect_hits(embedded_patterns),
+        "inference_engines": collect_hits(inference_patterns),
+        "model_files": model_files,
+    }
 
 
 def detect_api_routes(texts):
@@ -635,10 +774,10 @@ def detect_wsl_dependency(texts):
         (r"\bwsl\s+--distribution\b", "指定 WSL 发行版"),
         (r"powershell\.exe.*wsl|wsl\.exe", "通过 PowerShell/直接调用 wsl.exe"),
     ]
-    # 排除扫描器自身的文件
-    scanner_dir = str(Path(__file__).parent.relative_to(ROOT))
+    # 排除扫描器自身的文件；全局安装时脚本不在目标项目内，无需排除。
+    scanner_dir = scanner_relative_prefix()
     for rel, content in texts:
-        if rel.startswith(scanner_dir):
+        if scanner_dir and rel.startswith(scanner_dir):
             continue
         for pattern, label in wsl_cmd_patterns:
             for m in re.finditer(pattern, content, re.IGNORECASE):
@@ -657,9 +796,9 @@ def detect_wsl_dependency(texts):
         (r"(?i)windows\s+subsystem\s+for\s+linux", "文档中提及 Windows Subsystem for Linux"),
         (r"(?i)\bwsl\s+2?\b.{0,20}(?:ubuntu|debian|发行版)", "文档中指定 WSL 发行版"),
     ]
-    scanner_dir = str(Path(__file__).parent.relative_to(ROOT))
+    scanner_dir = scanner_relative_prefix()
     for rel, content in texts:
-        if rel.startswith(scanner_dir):
+        if scanner_dir and rel.startswith(scanner_dir):
             continue
         # 只检查文档和配置文件
         if not rel.endswith((".md", ".txt", ".rst", ".adoc")):
@@ -683,7 +822,7 @@ def detect_wsl_dependency(texts):
 
     # 5. package.json scripts 中引用 wsl
     for rel, content in texts:
-        if rel.startswith(scanner_dir):
+        if scanner_dir and rel.startswith(scanner_dir):
             continue
         if rel.endswith("package.json"):
             try:
@@ -862,23 +1001,48 @@ def build_key_files(report):
                   "vite.config.ts", "vite.config.js", "nuxt.config.ts",
                   "pnpm-workspace.yaml", "turbo.json", "nx.json", "lerna.json",
                   ".gitlab-ci.yml", "Jenkinsfile", ".circleci/config.yml",
-                  ".handoff.yml", ".mcp.json",
+                  ".handoff.yml", ".mcp.json", "go.mod", "Cargo.toml", "pom.xml",
+                  "build.gradle", "build.gradle.kts", "CMakeLists.txt", "Makefile",
+                  "meson.build", "platformio.ini",
                   ".claude/settings.json", ".claude/skills", ".claude/commands"]
-    files = [name for name in candidates if (ROOT / name).exists()]
+    files = []
+    seen = set()
+    for name in candidates:
+        path = ROOT / name
+        if path.exists():
+            rel = str(path.relative_to(ROOT)).replace("\\", "/")
+            key = rel.lower()
+            if key not in seen:
+                files.append(rel)
+                seen.add(key)
     # CI/CD 文件
     ci = report.get("ci_cd", {})
     for wf in ci.get("github_actions", []):
         f = f".github/workflows/{wf['file']}"
-        if f not in files:
+        if f.lower() not in seen:
             files.append(f)
+            seen.add(f.lower())
     # Docker
     docker = report.get("docker", {}).get("dockerfile")
-    if docker and docker["path"] not in files:
+    if docker and docker["path"].lower() not in seen:
         files.append(docker["path"])
+        seen.add(docker["path"].lower())
     # k8s
     for res in report.get("kubernetes", {}).get("resources", [])[:5]:
-        if res["file"] not in files:
+        if res["file"].lower() not in seen:
             files.append(res["file"])
+            seen.add(res["file"].lower())
+    native = report.get("native_embedded_ai", {})
+    manifests = native.get("manifests", {})
+    for key in ("go", "rust", "java_jvm", "dotnet", "native_build", "embedded"):
+        for path in manifests.get(key, [])[:5]:
+            if path.lower() not in seen:
+                files.append(path)
+                seen.add(path.lower())
+    for path in native.get("model_files", [])[:5]:
+        if path.lower() not in seen:
+            files.append(path)
+            seen.add(path.lower())
     return files
 
 
@@ -914,6 +1078,7 @@ def main() -> None:
         "external_resources": detect_external_resources(node_deps, texts),
         "environment_variables": detect_env_vars(texts),
         "database": detect_database(node_deps, py_deps),
+        "native_embedded_ai": detect_native_embedded_ai(texts),
         "api_routes": detect_api_routes(texts),
         "lan_startup": detect_lan_startup(texts, node_scripts),
         "frontend_mock": detect_mock(node_deps),
@@ -934,9 +1099,7 @@ def main() -> None:
     }
     report["key_files_to_read"] = build_key_files(report)
 
-    # 统一路径分隔符（Windows \ -> /）
     report_str = json.dumps(report, indent=2, ensure_ascii=False)
-    report_str = report_str.replace("\\", "/")
 
     OUT_DIR.mkdir(exist_ok=True)
     out = OUT_DIR / "analysis-report.json"
@@ -953,6 +1116,9 @@ def main() -> None:
     print(f"- AI SDKs: {[s['sdk'] for s in report['ai_services']['sdks']] or 'none'}")
     print(f"- Env vars declared/used: {len(report['environment_variables']['declared'])}/{len(report['environment_variables']['used_in_code'])}")
     print(f"- High entropy env values: {len(report['environment_variables']['high_entropy_values'])}")
+    native = report["native_embedded_ai"]
+    native_manifest_count = sum(len(v) for v in native["manifests"].values())
+    print(f"- Native/embedded manifests: {native_manifest_count}; inference engines: {[h['name'] for h in native['inference_engines']] or 'none'}")
     print(f"- MCP servers: {[s['name'] for s in report['mcp_servers']] or 'none'}")
     print(f"- WSL dependency: {report['wsl_dependency']['uses_wsl']} ({len(report['wsl_dependency']['evidence'])} evidence)")
     print(f"- Claude skills: {report['dev_platform']['claude_skills']['all'] or 'none'}")

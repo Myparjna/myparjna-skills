@@ -29,46 +29,47 @@
 ### 步骤详解
 
 ```bash
-# 1. 在项目根目录运行分析（只读，不修改项目文件）
-python scripts/analyze_project.py
-# 产出 handoff/analysis-report.json
+# 1. 在目标项目根目录运行分析（只读，不修改项目文件）
+# 如果本 skill 是全局安装的，把下面路径替换成 project-handoff skill 的实际目录
+python /absolute/path/to/project-handoff/scripts/analyze_project.py
+# 产出 ProjectDoc/analysis-report.json
 
 # 2. AI 阅读 key_files_to_read 中列出的关键文件（不可省略）
 #    理解项目业务目的、部署流程、环境变量用途、AI API 调用方式
 
 # 3. 生成文档骨架（带 TODO(AI) 标记）
-python scripts/generate_handoff.py --client-level developer
-# 产出 handoff/README.md ~ handoff/RUNBOOK.md
+python /absolute/path/to/project-handoff/scripts/generate_handoff.py --client-level developer
+# 产出 ProjectDoc/README.md ~ ProjectDoc/RUNBOOK.md
 
-# 4. AI（或人）按 references/fill-guide.md 填写所有 TODO(AI)
+# 4. AI（或人）按 skill 目录下的 fill-guide.md 填写所有 TODO(AI)
 #    不确定的内容标记为 [需向交接人确认: 具体问题]
 
 # 5. 质量门禁
-python scripts/verify_handoff.py
+python /absolute/path/to/project-handoff/scripts/verify_handoff.py
 # 退出码 0=通过  1=有 ERROR  2=检测到密钥泄露
 
 # 6. 打包（内部先验证，不通过则拒绝）
-python scripts/package_handoff.py
-# 产出 handoff/handoff-package.zip
+python /absolute/path/to/project-handoff/scripts/package_handoff.py
+# 产出 ProjectDoc/ProjectDoc-package.zip
 ```
 
 ## 产出文档
 
 | 文件 | 内容 |
 |---|---|
-| `handoff/analysis-report.json` | 静态分析事实清单（机器可读） |
-| `handoff/README.md` | 项目概览、技术栈、快速启动 |
-| `handoff/ARCHITECTURE.md` | 架构图、目录结构、技术选型 |
-| `handoff/ENVIRONMENT.md` | 全部环境变量说明、高熵值警告 |
-| `handoff/DEPLOYMENT.md` | Docker/Cloudflare/CI/K8s 部署 |
-| `handoff/INFRASTRUCTURE.md` | 域名、账号、第三方服务 |
-| `handoff/KNOWN-ISSUES.md` | 已知 Bug、技术债 |
-| `handoff/MAINTENANCE.md` | 日常维护、监控 |
-| `handoff/RUNBOOK.md` | 故障处置手册 |
-| `handoff/AI-SERVICES.md` | AI API 使用详情（条件生成） |
-| `handoff/API.md` | 接口清单（条件生成） |
-| `handoff/DATABASE.md` | 数据库文档（条件生成） |
-| `handoff/DESKTOP.md` | 桌面端文档（条件生成） |
+| `ProjectDoc/analysis-report.json` | 静态分析事实清单（机器可读） |
+| `ProjectDoc/README.md` | 项目概览、技术栈、快速启动 |
+| `ProjectDoc/ARCHITECTURE.md` | 架构图、目录结构、技术选型 |
+| `ProjectDoc/ENVIRONMENT.md` | 全部环境变量说明、高熵值警告 |
+| `ProjectDoc/DEPLOYMENT.md` | Docker/Cloudflare/CI/K8s 部署 |
+| `ProjectDoc/INFRASTRUCTURE.md` | 域名、账号、第三方服务 |
+| `ProjectDoc/KNOWN-ISSUES.md` | 已知 Bug、技术债 |
+| `ProjectDoc/MAINTENANCE.md` | 日常维护、监控 |
+| `ProjectDoc/RUNBOOK.md` | 故障处置手册 |
+| `ProjectDoc/AI-SERVICES.md` | AI API 使用详情（条件生成） |
+| `ProjectDoc/API.md` | 接口清单（条件生成） |
+| `ProjectDoc/DATABASE.md` | 数据库文档（条件生成） |
+| `ProjectDoc/DESKTOP.md` | 桌面端文档（条件生成） |
 
 ## 设计原则
 
@@ -90,6 +91,10 @@ python scripts/package_handoff.py
 | **云服务** | Cloudflare Workers/Pages (KV/D1/R2) |
 | **AI 服务** | OpenAI / Anthropic / Gemini / DashScope / 智谱 / DeepSeek / Ollama 等 SDK 和端点 |
 | **数据库** | PostgreSQL / MySQL / SQLite / MongoDB / Redis + Prisma / Drizzle / TypeORM / SQLAlchemy |
+| **原生/后端语言** | Go / Rust / Java/JVM / .NET manifest 与构建入口 |
+| **C/C++ 构建** | CMake / Makefile / Meson / Bazel 线索、GCC/Clang/交叉编译工具链关键词 |
+| **嵌入式** | PlatformIO / STM32CubeMX(.ioc) / Keil(.uvprojx) / IAR(.ewp) / linker script / FreeRTOS / Zephyr / ESP-IDF / CMSIS |
+| **本地推理** | YOLO / ONNX Runtime / TensorRT / OpenVINO / ncnn / MNN / TFLite / RKNN / OpenCV DNN / Darknet / TVM / llama.cpp/ggml |
 | **环境变量** | .env 文件声明 vs 源码使用交叉分析、高熵值检测 |
 | **外部资源** | HuggingFace / ModelScope 模型、GitHub 直装依赖、CDN 链接 |
 | **WSL** | WSL1/WSL2 版本、发行版检测 |
@@ -107,7 +112,7 @@ max_files: 5000                       # 最大扫描文件数（默认 3000）
 
 ## 局限
 
-- **主要支持 JS/TS + Python + .NET 生态**。Go、Rust、Java、Ruby、PHP 的框架和依赖检测为实验性支持（仅扫描源码中的环境变量引用和 AI 端点），完整的 manifest 解析（go.mod、Cargo.toml、pom.xml 等）尚未实现
+- **深度解析仍以 JS/TS + Python + .NET 为主**。Go、Rust、Java、C/C++、嵌入式和本地推理项目会检测 manifest、构建入口、工具链和关键线索，但不会完整解析所有依赖图、编译选项和板卡 BSP
 - 静态分析覆盖不到的内容（账号归属、口头约定、历史决策）依赖交接人回答待确认问题
 - 动态生成的环境变量名（如 `process.env[key]`）无法检测
 - 仅扫描常见密钥格式，verify 通过不代表绝对无泄露，交付前仍建议人工过一遍 ENVIRONMENT 和 INFRASTRUCTURE 文档

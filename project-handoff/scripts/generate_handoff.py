@@ -7,7 +7,7 @@ import sys
 from datetime import datetime
 
 ROOT = Path.cwd()
-OUT = ROOT / "handoff"
+OUT = ROOT / "ProjectDoc"
 REPORT_PATH = OUT / "analysis-report.json"
 
 
@@ -107,6 +107,33 @@ def doc_architecture(r):
                             f"- 类型: {mono['type']}\n- 工具: {', '.join(mono.get('tools', []))}\n- workspace 数量: {mono.get('workspace_count', '未知')}",
                             todo("说明各 workspace 的职责划分、依赖关系、构建顺序"))
 
+    # Native / embedded / local inference 信息
+    native = r.get("native_embedded_ai", {})
+    native_text = ""
+    if native:
+        manifests = native.get("manifests", {})
+        manifest_lines = []
+        for key, label in [("go", "Go"), ("rust", "Rust"), ("java_jvm", "Java/JVM"),
+                           ("dotnet", ".NET"), ("native_build", "C/C++ 构建"),
+                           ("embedded", "嵌入式工程")]:
+            paths = manifests.get(key, [])
+            if paths:
+                manifest_lines.append(f"- {label}: " + ", ".join(f"`{p}`" for p in paths[:8]))
+        signal_lines = []
+        for key, label in [("compilers_and_build_tools", "编译/构建工具"),
+                           ("embedded_signals", "嵌入式线索"),
+                           ("inference_engines", "本地推理引擎")]:
+            hits = native.get(key, [])
+            if hits:
+                signal_lines.append(f"- {label}: " + ", ".join(f"{h['name']} (`{h['found_in']}`)" for h in hits))
+        model_files = native.get("model_files", [])
+        if model_files:
+            signal_lines.append("- 模型/权重文件: " + ", ".join(f"`{p}`" for p in model_files[:12]))
+        if manifest_lines or signal_lines:
+            native_text = section("原生/嵌入式/本地推理",
+                                  "\n".join(manifest_lines + signal_lines),
+                                  todo("如果项目包含 C/C++/Go/Rust/Java/.NET、嵌入式固件或 YOLO/ONNX/TensorRT/RKNN 等本地推理，请说明：目标平台、交叉编译工具链、构建命令、模型文件来源、运行依赖、硬件加速要求和最小验证命令。不确定的硬件/板卡/驱动版本写 [需向交接人确认: ...]"))
+
     # WSL 信息
     wsl_text = ""
     if wsl.get("uses_wsl"):
@@ -155,6 +182,7 @@ def doc_architecture(r):
                 todo("用一段话解释数据流向：用户请求从哪进来、经过什么、数据存到哪")),
         section("目录结构", f"```\n{tree}\n```", todo("为上面树中 5-10 个关键目录各加一行用途说明")),
         mono_text,
+        native_text,
         wsl_text,
         section("技术选型与路线",
                 todo("说明关键技术为什么这么选（如有历史原因或曾经换过方案，向用户提问后记录）。来源：CLAUDE.md、git log、向用户提问。不知道就写 [需向交接人确认: 技术选型背景]")),
@@ -419,7 +447,7 @@ def main():
         todo_count = content.count("TODO(AI)")
         print(f"  {name:22s} {todo_count} 个 TODO 待填写")
 
-    print(f"\n生成 {len(docs)} 份骨架于 handoff/。下一步：按 references/fill-guide.md 逐个消除 TODO(AI)，然后运行 verify_handoff.py。")
+    print(f"\n生成 {len(docs)} 份骨架于 ProjectDoc/。下一步：按 skill 目录下的 fill-guide.md 逐个消除 TODO(AI)，然后运行 verify_handoff.py。")
 
 
 if __name__ == "__main__":
