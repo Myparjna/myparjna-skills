@@ -48,9 +48,10 @@ def search_keyword(query, page=1, limit=20, sort_by="recent",
 
 
 def search_ai(query):
-    """AI 语义搜索 → (data, remaining)"""
-    params = {"q": query}
-    url = f"{API_BASE}/ai-search?{urllib.parse.urlencode(params)}"
+    """AI 语义搜索（降级到关键字搜索，因官方无此端点）→ (data, remaining)"""
+    # SkillsMP 官方 API 不支持 ai-search 端点，降级到关键字搜索
+    params = {"q": query, "limit": 20}
+    url = f"{API_BASE}/search?{urllib.parse.urlencode(params)}"
     return _request(url)
 
 
