@@ -1,6 +1,6 @@
 # 交接文档填写指南
 
-> 本指南给负责填写 `handoff/` 下 TODO(AI) 的人（或 AI）使用。
+> 本指南给负责填写 `ProjectDoc/` 下 TODO(AI) 的人（或 AI）使用。
 > 填写完成后必须运行 `python scripts/verify_handoff.py` 并通过。
 
 ## 核心原则
