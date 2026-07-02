@@ -2,6 +2,7 @@
 """Scan the project and emit ProjectDoc/analysis-report.json for handoff doc generation."""
 from pathlib import Path
 from datetime import datetime, timezone
+import io
 import json
 import math
 import re
@@ -10,7 +11,7 @@ import sys
 
 ROOT = Path.cwd()
 OUT_DIR = ROOT / "ProjectDoc"
-TOOL_VERSION = "2.0.0"
+TOOL_VERSION = "2.5.0"
 SCHEMA_VERSION = 2
 
 # --- 配置（可被 .handoff.yml 覆盖） ---
@@ -18,7 +19,9 @@ SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", "out",
     "__pycache__", ".venv", "venv", "env", ".turbo", "coverage", ".cache",
     "target", "vendor", ".pytest_cache", ".mypy_cache", "ProjectDoc",
-    ".mypy_cache", ".ruff_cache", ".tox", "egg-info",
+    ".mypy_cache", ".ruff_cache", ".tox", ".nox", ".eggs", ".pythonlibs",
+    "__pypackages__", "site-packages", "dist-packages", "egg-info",
+    "pip-wheel-metadata", ".hypothesis", ".ipynb_checkpoints",
 }
 GREP_EXT = {".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".py", ".html",
              ".cjs", ".mjs", ".md", ".toml", ".yml", ".yaml", ".json",
@@ -34,11 +37,12 @@ GREP_FILENAMES = {
 }
 MAX_FILE_SIZE = 512_000
 MAX_GREP_FILES = 3000
+INCLUDE_DIRS = []
 
 
 def load_config():
     """加载 .handoff.yml 配置（可选）。"""
-    global SKIP_DIRS, MAX_GREP_FILES
+    global SKIP_DIRS, MAX_GREP_FILES, INCLUDE_DIRS
     config_path = ROOT / ".handoff.yml"
     if not config_path.exists():
         return
@@ -56,6 +60,8 @@ def load_config():
                 if key == "skip_dirs" and val.startswith("["):
                     extra = [s.strip().strip("'\"") for s in val.strip("[]").split(",") if s.strip()]
                     SKIP_DIRS = SKIP_DIRS | set(extra)
+                elif key == "include_dirs" and val.startswith("["):
+                    INCLUDE_DIRS = [s.strip().strip("'\"") for s in val.strip("[]").split(",") if s.strip()]
                 elif key == "max_files" and val.isdigit():
                     MAX_GREP_FILES = int(val)
     except Exception:
@@ -71,6 +77,45 @@ def read_text(path: Path) -> str:
         return ""
 
 
+def is_skipped_path(path: Path) -> bool:
+    """Return True for generated, dependency, cache, and virtualenv paths."""
+    parts = [part.lower() for part in path.parts]
+    skip = {name.lower() for name in SKIP_DIRS}
+    if any(part in skip for part in parts):
+        return True
+    if any(part.endswith((".egg-info", ".dist-info")) for part in parts):
+        return True
+
+    # Some uv/venv directories are renamed to a domain-specific name. A
+    # pyvenv.cfg marker is the reliable signal that the whole tree is a
+    # virtual environment, regardless of directory name.
+    current = path if path.is_dir() else path.parent
+    try:
+        current = current.resolve()
+        root = ROOT.resolve()
+    except OSError:
+        return False
+    while True:
+        if (current / "pyvenv.cfg").exists():
+            return True
+        if current == root or root not in current.parents:
+            break
+        current = current.parent
+    return False
+
+
+def scan_roots():
+    """Return roots to scan. include_dirs narrows large workspace folders."""
+    if not INCLUDE_DIRS:
+        return [ROOT]
+    roots = []
+    for entry in INCLUDE_DIRS:
+        path = (ROOT / entry).resolve()
+        if path.is_dir() and not is_skipped_path(path):
+            roots.append(path)
+    return roots or [ROOT]
+
+
 def scanner_relative_prefix():
     """Return scanner script path relative to ROOT when the skill is vendored into the project."""
     try:
@@ -84,7 +129,7 @@ def rel_path(path: Path) -> str:
 
 
 def iter_files():
-    stack = [ROOT]
+    stack = list(scan_roots())
     count = 0
     while stack:
         current = stack.pop()
@@ -94,7 +139,7 @@ def iter_files():
             continue
         for path in entries:
             if path.is_dir():
-                if path.name not in SKIP_DIRS and not path.name.startswith("."):
+                if not is_skipped_path(path) and not path.name.startswith("."):
                     stack.append(path)
             elif path.is_file():
                 count += 1
@@ -143,10 +188,11 @@ def find_manifests():
                          ("*.mk", "native"), ("meson.build", "native"),
                          ("platformio.ini", "embedded"), ("*.ioc", "embedded"),
                          ("*.uvprojx", "embedded"), ("*.ewp", "embedded")]:
-        for depth in ("", "*/", "*/*/"):
-            for path in ROOT.glob(depth + pattern):
-                if not any(part in SKIP_DIRS for part in path.parts):
-                    manifests[key].append(path)
+        for root in scan_roots():
+            for depth in ("", "*/", "*/*/"):
+                for path in root.glob(depth + pattern):
+                    if not is_skipped_path(path) and path not in manifests[key]:
+                        manifests[key].append(path)
     return manifests
 
 
@@ -195,15 +241,23 @@ def detect_package_manager():
         "bun.lockb": "bun",
         "package-lock.json": "npm",
     }
+    roots = scan_roots()
     for lockfile, manager in lockfiles.items():
-        if (ROOT / lockfile).exists():
+        if any((root / lockfile).exists() for root in roots):
             managers.append(manager)
+    has_package_json = any(
+        path.name == "package.json" and not is_skipped_path(path)
+        for root in roots
+        for path in root.glob("**/package.json")
+    )
+    if has_package_json and not any(m in managers for m in ("npm", "pnpm", "yarn", "bun")):
+        managers.append("npm (inferred, no lockfile)")
     # Python
-    if (ROOT / "uv.lock").exists():
+    if any((root / "uv.lock").exists() for root in roots):
         managers.append("uv")
-    elif (ROOT / "Pipfile.lock").exists():
+    elif any((root / "Pipfile.lock").exists() for root in roots):
         managers.append("pipenv")
-    elif (ROOT / "poetry.lock").exists():
+    elif any((root / "poetry.lock").exists() for root in roots):
         managers.append("poetry")
     # 去重
     return sorted(set(managers)) or ["unknown"]
@@ -514,10 +568,14 @@ def detect_high_entropy_env_values():
     high_entropy = []
     # 动态发现所有 .env 变体文件
     env_files = sorted(set(
-        rel_path(p) for p in ROOT.glob(".env*")
-        if p.is_file() and p.name != ".env.example" and not p.name.startswith(".env.")
-        or p.name in (".env.local", ".env.development", ".env.staging",
-                       ".env.test", ".env.production", ".env.backup")
+        rel_path(p)
+        for root in [ROOT, *scan_roots()]
+        for p in root.glob(".env*")
+        if p.is_file() and (
+            p.name != ".env.example" and not p.name.startswith(".env.")
+            or p.name in (".env.local", ".env.development", ".env.staging",
+                          ".env.test", ".env.production", ".env.backup")
+        )
     ))
     # 兜底：至少检查这些
     for fallback in (".env", ".env.local", ".env.production"):
@@ -546,19 +604,33 @@ def detect_high_entropy_env_values():
 
 def detect_env_vars(texts):
     declared = {}
-    for name in (".env.example", ".env.sample", ".env.template", ".env"):
-        path = ROOT / name
-        if not path.exists():
-            continue
-        for line in read_text(path).splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                key, _, value = line.partition("=")
-                key = key.strip()
-                if key not in declared:
-                    declared[key] = {"source": name,
-                                     "default": value.strip() if name != ".env" else "<redacted: real .env>"}
+    seen_env_roots = []
+    for root in [ROOT, *scan_roots()]:
+        if root not in seen_env_roots:
+            seen_env_roots.append(root)
+    for root in seen_env_roots:
+        for name in (".env.example", ".env.sample", ".env.template", ".env"):
+            path = root / name
+            if not path.exists():
+                continue
+            source = rel_path(path)
+            for line in read_text(path).splitlines():
+                line = line.strip()
+                if name in (".env.example", ".env.sample", ".env.template") and line.startswith("#"):
+                    line = line[1:].strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    if re.match(r"^[A-Z][A-Z0-9_]*$", key) and key not in declared:
+                        declared[key] = {"source": source,
+                                         "default": value.strip() if name != ".env" else "<redacted: real .env>"}
     used = set()
+    used_locations = {}
+
+    def note_usage(name, rel):
+        used.add(name)
+        used_locations.setdefault(name, set()).add(rel)
+
     precise_patterns = [
         # JS / TS / Vite / Node
         r"process\.env\.([A-Z0-9_]+)",
@@ -594,14 +666,17 @@ def detect_env_vars(texts):
     ]
     for rel, content in texts:
         for pattern in precise_patterns:
-            used.update(re.findall(pattern, content))
+            for name in re.findall(pattern, content):
+                note_usage(name, rel)
         if rel.endswith(shell_like_files) or Path(rel).name in shell_like_files:
             for pattern in shell_patterns:
-                used.update(re.findall(pattern, content))
+                for name in re.findall(pattern, content):
+                    note_usage(name, rel)
     declared_keys = set(declared)
     return {
         "declared": [{"name": k, **v} for k, v in sorted(declared.items())],
         "used_in_code": sorted(used),
+        "used_locations": {k: sorted(v) for k, v in sorted(used_locations.items())},
         "used_but_not_declared": sorted(used - declared_keys),
         "declared_but_not_used": sorted(declared_keys - used),
         "high_entropy_values": detect_high_entropy_env_values(),
@@ -635,14 +710,15 @@ def detect_native_embedded_ai(texts):
     def rel_paths(patterns, limit=20):
         paths = []
         for pattern in patterns:
-            for depth in ("", "*/", "*/*/"):
-                for path in ROOT.glob(depth + pattern):
-                    if path.is_file() and not any(part in SKIP_DIRS for part in path.parts):
-                        rel = rel_path(path)
-                        if rel not in paths:
-                            paths.append(rel)
-                            if len(paths) >= limit:
-                                return paths
+            for root in scan_roots():
+                for depth in ("", "*/", "*/*/"):
+                    for path in root.glob(depth + pattern):
+                        if path.is_file() and not is_skipped_path(path):
+                            rel = rel_path(path)
+                            if rel not in paths:
+                                paths.append(rel)
+                                if len(paths) >= limit:
+                                    return paths
         return paths
 
     manifests = {
@@ -985,17 +1061,24 @@ def dir_tree(max_depth=2):
         except OSError:
             return
         for path in entries:
-            if path.name in SKIP_DIRS or path.name.startswith("."):
+            if is_skipped_path(path) or path.name.startswith("."):
                 continue
             lines.append("  " * depth + ("[DIR] " if path.is_dir() else "") + path.name)
             if path.is_dir():
                 walk(path, depth + 1)
-    walk(ROOT, 0)
+    roots = scan_roots()
+    if roots == [ROOT]:
+        walk(ROOT, 0)
+    else:
+        for root in roots:
+            lines.append("[DIR] " + rel_path(root))
+            walk(root, 1)
     return lines[:150]
 
 
 def build_key_files(report):
-    candidates = ["README.md", "readme.md", ".env.example", "Dockerfile", "docker-compose.yml",
+    candidates = ["README.md", "readme.md", "package.json", "pyproject.toml", "requirements.txt",
+                  ".env.example", "Dockerfile", "docker-compose.yml",
                   "wrangler.toml", "wrangler.jsonc", "prisma/schema.prisma",
                   "src-tauri/tauri.conf.json", "CLAUDE.md", "next.config.js", "next.config.ts",
                   "vite.config.ts", "vite.config.js", "nuxt.config.ts",
@@ -1007,42 +1090,55 @@ def build_key_files(report):
                   ".claude/settings.json", ".claude/skills", ".claude/commands"]
     files = []
     seen = set()
-    for name in candidates:
-        path = ROOT / name
-        if path.exists():
-            rel = str(path.relative_to(ROOT)).replace("\\", "/")
+
+    def add_file(rel):
+        if not rel:
+            return
+        rel = str(rel).strip().strip("`").replace("\\", "/").lstrip("./")
+        if not rel or rel.startswith(("http://", "https://")):
+            return
+        path = ROOT / rel
+        if path.exists() and path.is_file():
             key = rel.lower()
             if key not in seen:
                 files.append(rel)
                 seen.add(key)
+
+    for name in candidates:
+        add_file(name)
     # CI/CD 文件
     ci = report.get("ci_cd", {})
     for wf in ci.get("github_actions", []):
         f = f".github/workflows/{wf['file']}"
-        if f.lower() not in seen:
-            files.append(f)
-            seen.add(f.lower())
+        add_file(f)
     # Docker
     docker = report.get("docker", {}).get("dockerfile")
-    if docker and docker["path"].lower() not in seen:
-        files.append(docker["path"])
-        seen.add(docker["path"].lower())
+    if docker:
+        add_file(docker.get("path"))
     # k8s
     for res in report.get("kubernetes", {}).get("resources", [])[:5]:
-        if res["file"].lower() not in seen:
-            files.append(res["file"])
-            seen.add(res["file"].lower())
+        add_file(res.get("file"))
+
+    # 必读源码：环境变量、API 路由、AI 端点/模型名所在文件。
+    env = report.get("environment_variables", {})
+    for paths in env.get("used_locations", {}).values():
+        for path in paths:
+            add_file(path)
+    for route in report.get("api_routes", []):
+        match = re.search(r"\(([^()]+)\)\s*$", str(route))
+        if match:
+            add_file(match.group(1))
+    ai = report.get("ai_services", {})
+    for key in ("endpoints", "model_names"):
+        for item in ai.get(key, []):
+            add_file(item.get("found_in"))
     native = report.get("native_embedded_ai", {})
     manifests = native.get("manifests", {})
     for key in ("go", "rust", "java_jvm", "dotnet", "native_build", "embedded"):
         for path in manifests.get(key, [])[:5]:
-            if path.lower() not in seen:
-                files.append(path)
-                seen.add(path.lower())
+            add_file(path)
     for path in native.get("model_files", [])[:5]:
-        if path.lower() not in seen:
-            files.append(path)
-            seen.add(path.lower())
+        add_file(path)
     return files
 
 
@@ -1050,7 +1146,7 @@ def main() -> None:
     load_config()
 
     # 统计文件总数（用于扫描完整性报告）
-    total_files = sum(1 for _ in ROOT.rglob("*") if _.is_file() and not any(p in SKIP_DIRS for p in _.parts))
+    total_files = sum(1 for root in scan_roots() for _ in root.rglob("*") if _.is_file() and not is_skipped_path(_))
 
     texts = collect_source_texts()
     scanned_count = len(texts)
@@ -1125,6 +1221,15 @@ def main() -> None:
     print(f"- Scan: {scanned_count}/{total_files} files" + (" (TRUNCATED)" if truncated else ""))
     print(f"- MUST READ files: {report['key_files_to_read']}")
 
+
+# Windows GBK 控制台无法输出 emoji/特殊 Unicode，强制 UTF-8
+if sys.platform == "win32":
+    for _stream_name in ("stdout", "stderr"):
+        _stream = getattr(sys, _stream_name)
+        if hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        else:
+            setattr(sys, _stream_name, io.TextIOWrapper(_stream.buffer, encoding="utf-8", errors="replace"))
 
 if __name__ == "__main__":
     main()

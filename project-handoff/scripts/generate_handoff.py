@@ -2,6 +2,7 @@
 """Generate handoff doc skeletons from analysis-report.json. Each TODO(AI) carries fill instructions."""
 from pathlib import Path
 import argparse
+import io
 import json
 import sys
 from datetime import datetime
@@ -201,9 +202,9 @@ def doc_architecture(r):
 
 def doc_environment(r):
     env = r["environment_variables"]
-    rows = [[f"`{v['name']}`", v["source"], todo("用途？"), todo("从哪获取？给出精确路径，如'OpenAI 后台 → API Keys'"), todo("必需/可选"), todo("泄露影响: 高/中/低")]
+    rows = [[f"`{v['name']}`", v["source"], todo("补充：用途、获取方式（精确入口）、必需性（本地/CI/生产）、泄露影响（高/中/低）。")]
             for v in env["declared"]]
-    rows += [[f"`{name}`", "**仅源码中使用，未在 .env.example 声明**", todo("用途？"), todo("从哪获取？"), todo("必需/可选"), todo("泄露影响")]
+    rows += [[f"`{name}`", "**仅源码中使用，未在 .env.example 声明**", todo("补充：源码用途、是否应加入 .env.example、获取方式、必需性、泄露影响。")]
              for name in env["used_but_not_declared"]]
     unused = ""
     if env["declared_but_not_used"]:
@@ -224,7 +225,7 @@ def doc_environment(r):
         "# 环境变量",
         "⚠️ 本文档不包含任何真实密钥值。真实值通过安全渠道单独交接。",
         cross_ref("DEPLOYMENT.md", "密钥在各部署平台的配置位置"),
-        section("变量清单", table(["变量名", "声明位置", "用途", "获取方式", "必需性", "泄露影响"], rows) if rows else "未检测到环境变量。"),
+        section("变量清单", table(["变量名", "来源", "交接说明"], rows) if rows else "未检测到环境变量。"),
         unused,
         high_entropy,
         section("密钥轮换", todo("说明交接后哪些密钥必须立刻轮换（原则上所有 API key 都应轮换），以及每个的轮换入口")),
@@ -449,6 +450,15 @@ def main():
 
     print(f"\n生成 {len(docs)} 份骨架于 ProjectDoc/。下一步：按 skill 目录下的 fill-guide.md 逐个消除 TODO(AI)，然后运行 verify_handoff.py。")
 
+
+# Windows GBK 控制台无法输出 emoji/特殊 Unicode，强制 UTF-8
+if sys.platform == "win32":
+    for _stream_name in ("stdout", "stderr"):
+        _stream = getattr(sys, _stream_name)
+        if hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        else:
+            setattr(sys, _stream_name, io.TextIOWrapper(_stream.buffer, encoding="utf-8", errors="replace"))
 
 if __name__ == "__main__":
     main()

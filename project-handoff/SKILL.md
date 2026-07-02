@@ -1,11 +1,13 @@
 ---
 name: project-handoff
-description: "Generate complete project handoff documentation: architecture overview, deployment guides (Docker/Cloudflare/CI/K8s), environment variables, AI API usage, database, native/embedded builds, local inference engines, known issues, and operational runbooks. Use when delivering a project to a client, transitioning a codebase between teams or AI agents, onboarding maintainers, or packaging a project for long-term maintenance."
+description: "Generate, inspect, or refresh complete project handoff documentation: architecture overview, deployment guides (Docker/Cloudflare/CI/K8s), environment variables, AI API usage, database, native/embedded builds, local inference engines, known issues, and operational runbooks. Use when delivering a project to a client, transitioning a codebase between teams or AI agents, onboarding maintainers, packaging a project for long-term maintenance, or when the user says: 交接文档, 更新交接文档, 更新文档, 查看交接文档."
 ---
 
 # Project Handoff
 
 为项目生成完整的 `ProjectDoc/` 交接文档包。本技能由"脚本扫描 + AI 补全 + 脚本验收"三段构成。**你（AI）的核心工作在 Step 4：把骨架中的每一个 `TODO(AI)` 替换为真实内容。**
+
+适用触发词包括：`交接文档`、`更新交接文档`、`更新文档`、`查看交接文档`、`project handoff`、`handoff docs`。注意：当前脚本支持的是重建式刷新；重新运行 `generate_handoff.py` 会清理 `ProjectDoc/` 下旧的 `.md` 骨架再生成，不会自动合并旧文档中的人工补充内容。更新已有文档前应先备份或人工迁移需要保留的内容。
 
 ## 硬性规则（MUST）
 
