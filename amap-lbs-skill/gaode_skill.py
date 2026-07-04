@@ -11,6 +11,7 @@
 """
 
 import sys
+import io
 import json
 import socket
 import time
@@ -270,6 +271,15 @@ def main() -> None:
         print("\n已取消。")
         sys.exit(0)
 
+
+# Windows GBK 控制台无法输出 emoji/特殊 Unicode，强制 UTF-8
+if sys.platform == "win32":
+    for _stream_name in ("stdout", "stderr"):
+        _stream = getattr(sys, _stream_name)
+        if hasattr(_stream, "reconfigure"):
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        else:
+            setattr(sys, _stream_name, io.TextIOWrapper(_stream.buffer, encoding="utf-8", errors="replace"))
 
 if __name__ == "__main__":
     main()

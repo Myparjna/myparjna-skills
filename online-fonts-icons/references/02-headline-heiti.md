@@ -1,4 +1,4 @@
-# ② Headline Heiti / 标题黑体（7 款）
+# ② Headline Heiti / 标题黑体（5 款）
 
 适合大标题、品牌名、海报主视觉、数字大屏数据标题等需要视觉冲击力的场景。
 
@@ -44,45 +44,26 @@ h1 { font-family: 'DingTalk JinBuTi', sans-serif; }
 
 ## 抖音美好体 Bold
 
-- **font-family**: `Douyin Sans`
+- **font-family**: `DouyinSans` （⚠️ 实测：CSS 实际声明为 DouyinSans，无空格，不是 Douyin Sans）
 - **风格**: 简洁现代的粗圆体，笔画圆润饱满，适合年轻化产品/社交类标题
-- **来源**: chinese-fonts-cdn
+- **来源**: ZeoSeven
 - **原址**: https://github.com/bytedance/fonts / https://fonts.zeoseven.com/items/84/
 
 ### CDN
 
 ```html
-<link rel="stylesheet" href="https://chinese-fonts-cdn.deno.dev/packages/dym/dist/DouyinSansBold/result.css">
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/84/main/result.css">
 ```
 
 ```css
-h1 { font-family: 'Douyin Sans', sans-serif; }
-```
-
----
-
-## 快看世界体
-
-- **font-family**: `快看世界体`
-- **风格**: 微斜粗黑体，笔画硬朗有力量感，适合新闻/媒体/内容平台标题
-- **来源**: chinese-fonts-cdn
-- **原址**: https://www.kuaikanmanhua.com/
-
-### CDN
-
-```html
-<link rel="stylesheet" href="https://chinese-fonts-cdn.deno.dev/packages/kksjt/dist/kuaikanshijieti20231213/result.css">
-```
-
-```css
-h1 { font-family: '快看世界体', sans-serif; }
+h1 { font-family: 'DouyinSans', sans-serif; }
 ```
 
 ---
 
 ## 爱点风雅黑
 
-- **font-family**: `爱点风雅黑`
+- **font-family**: `Aidian FengYaHei` （⚠️ 实测：CSS 实际声明为英文 ID，不是中文名）
 - **风格**: 商务稳重风黑体，笔画正式规范，适合企业官网/商务系统/正式场合
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/354/
@@ -94,7 +75,7 @@ h1 { font-family: '快看世界体', sans-serif; }
 ```
 
 ```css
-h1 { font-family: '爱点风雅黑', sans-serif; }
+h1 { font-family: 'Aidian FengYaHei', sans-serif; }
 ```
 
 ---
@@ -124,7 +105,7 @@ h1 { font-family: 'Smiley Sans Oblique', sans-serif; }
 
 ## 摇醒青年黑
 
-- **font-family**: `摇醒青年黑`
+- **font-family**: `摇醒青年黑1.0` （⚠️ 实测：CSS 实际声明带版本后缀 1.0）
 - **风格**: 活力十足，粗犷奔放，笔触带有青春躁动感，适合年轻化/活动/音乐类
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/403/
@@ -136,5 +117,15 @@ h1 { font-family: 'Smiley Sans Oblique', sans-serif; }
 ```
 
 ```css
-h1 { font-family: '摇醒青年黑', sans-serif; }
+h1 { font-family: '摇醒青年黑1.0', sans-serif; }
 ```
+
+---
+
+## 已移除
+
+### 快看世界体
+
+- 原 CDN 已失效
+- 暂未找到可替代 WebFont CDN
+- 已从 skill 中移除

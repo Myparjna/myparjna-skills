@@ -34,7 +34,7 @@ body { font-family: 'AlibabaPuHuiTi-3-Medium', sans-serif; }
 
 ## HarmonyOS Sans SC
 
-- **font-family**: `HarmonySans SC`
+- **font-family**: `HarmonyOS Sans SC` （⚠️ 注意：原 skill 误写为 HarmonySans SC）
 - **来源**: 华为 HarmonyOS 系统字体
 - **官网**: https://developer.huawei.com/consumer/cn/design/resource/
 
@@ -47,5 +47,5 @@ body { font-family: 'AlibabaPuHuiTi-3-Medium', sans-serif; }
 ### 使用
 
 ```css
-body { font-family: 'HarmonySans SC', sans-serif; }
+body { font-family: 'HarmonyOS Sans SC', sans-serif; }
 ```

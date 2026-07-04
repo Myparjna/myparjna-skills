@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "byted-bp-searchinfinity-web-search": {
+      "source": "bytedance/agentkit-samples",
+      "sourceType": "github",
+      "skillPath": "skills/byted-bp-searchinfinity-web-search/SKILL.md",
+      "computedHash": "90bb4a19cbdf158668bc05ae8bb348f060ed464abdef8b5d94f75177d6fa2af7"
+    },
+    "byted-deepsearch": {
+      "source": "bytedance/agentkit-samples",
+      "sourceType": "github",
+      "skillPath": "skills/byted-deepsearch/SKILL.md",
+      "computedHash": "607c6d066e0a8353790c36a7e0c4094505141fb26aabe1c58cec01b6ed44faa1"
+    },
+    "byted-web-search": {
+      "source": "bytedance/agentkit-samples",
+      "sourceType": "github",
+      "skillPath": "skills/byted-web-search/SKILL.md",
+      "computedHash": "579a7ca33debde5ced940bb18a729ea8ad5e785bc098c0874246a098da86c11d"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-# ③ Song / Kai / Calligraphy / 宋体楷体书法风格（11 款）
+# ③ Song / Kai / Calligraphy / 宋体楷体书法风格（10 款）
 
 适合传统文化、文艺出版物、古风 UI、书法展示等场景。
 
@@ -6,7 +6,7 @@
 
 ## 阿里妈妈东方大楷
 
-- **font-family**: `MaShanZheng`
+- **font-family**: `Alimama DongFangDaKai` （⚠️ 实测：CSS 实际声明为英文 ID，不是 MaShanZheng）
 - **风格**: 正统书法楷体，笔画规范端庄，适合传统文化/教育/文艺类标题
 - **来源**: cn-fontsource (jsDelivr)
 - **原址**: https://fonts.alibabagroup.com/
@@ -18,45 +18,26 @@
 ```
 
 ```css
-h1 { font-family: 'MaShanZheng', serif; }
+h1 { font-family: 'Alimama DongFangDaKai', serif; }
 ```
 
 ---
 
 ## 上图东观体（粗体）
 
-- **font-family**: `STDongGuanTi Bld`
-- **风格**: 宋体与楷体的融合体，横细竖粗带轻微右倾，有传统书卷气又不失现代感
-- **来源**: chinese-fonts-cdn
-- **原址**: https://chinese-font.netlify.app/zh-cn/
+- **font-family**: `STDongGuanTi`
+- **风格**: 宋体与楷体的融合体，横细竖粗带轻微右倾，有传统书卷气又不失���代感
+- **来源**: ZeoSeven (已替换原 chinese-fonts-cdn)
+- **原址**: https://fonts.zeoseven.com/items/488/
 
 ### CDN
 
 ```html
-<link rel="stylesheet" href="https://chinese-fonts-cdn.deno.dev/packages/stdgt/dist/上图东观体-粗体/result.css">
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/488/main/result.css">
 ```
 
 ```css
-h1 { font-family: 'STDongGuanTi Bld', serif; }
-```
-
----
-
-## 思源屏显臻宋
-
-- **font-family**: `Source Han Serif CN for Display`
-- **风格**: 高质量屏幕优化宋体，横细竖粗，笔画精致，Adobe 开源
-- **来源**: chinese-fonts-cdn
-- **原址**: https://github.com/izfsk-ium/Clear-Han-Serif
-
-### CDN
-
-```html
-<link rel="stylesheet" href="https://chinese-fonts-cdn.deno.dev/packages/sypxzs/dist/思源屏显臻宋/result.css">
-```
-
-```css
-h1 { font-family: 'Source Han Serif CN for Display', serif; }
+h1 { font-family: 'STDongGuanTi', serif; }
 ```
 
 ---
@@ -82,7 +63,7 @@ body { font-family: 'LXGW WenKai GB Screen', serif; }
 
 ## 极影毁片辉宋
 
-- **font-family**: `极影毁片辉宋`
+- **font-family**: `极影毁片辉宋 Bold` （⚠️ 实测：CSS 实际声明带 Bold 后缀）
 - **风格**: 艺术宋体，影像曝光风格，笔画带有胶片颗粒/故障艺术感
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/183/
@@ -94,14 +75,14 @@ body { font-family: 'LXGW WenKai GB Screen', serif; }
 ```
 
 ```css
-h1 { font-family: '极影毁片辉宋', serif; }
+h1 { font-family: '极影毁片辉宋 Bold', serif; }
 ```
 
 ---
 
 ## 香萃端庄宋体
 
-- **font-family**: `香萃端庄宋体`
+- **font-family**: `XCDUANZHUANGSONG` （⚠️ 实测：CSS 实际声明为英文 ID）
 - **风格**: 端庄正式，高品质排版级宋体，横细竖粗比例经典
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/978/
@@ -113,14 +94,14 @@ h1 { font-family: '极影毁片辉宋', serif; }
 ```
 
 ```css
-h1 { font-family: '香萃端庄宋体', serif; }
+h1 { font-family: 'XCDUANZHUANGSONG', serif; }
 ```
 
 ---
 
 ## 寒蝉活宋体
 
-- **font-family**: `寒蝉活宋体`
+- **font-family**: `ChillHuoSong_F` （⚠️ 实测：CSS 实际声明为英文 ID）
 - **风格**: 传统活字印刷风格宋体，经典雅致，带有木活字的古朴质感
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/875/
@@ -132,14 +113,14 @@ h1 { font-family: '香萃端庄宋体', serif; }
 ```
 
 ```css
-h1 { font-family: '寒蝉活宋体', serif; }
+h1 { font-family: 'ChillHuoSong_F', serif; }
 ```
 
 ---
 
 ## 猫啃网风雅宋
 
-- **font-family**: `猫啃网风雅宋`
+- **font-family**: `MaoKenWangFengYaSong` （⚠️ 实测：CSS 实际声明为英文 ID）
 - **风格**: 古风优雅宋体，装饰性强，适合古风 UI/国潮/文化类装饰文字
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/175/
@@ -151,14 +132,14 @@ h1 { font-family: '寒蝉活宋体', serif; }
 ```
 
 ```css
-h1 { font-family: '猫啃网风雅宋', serif; }
+h1 { font-family: 'MaoKenWangFengYaSong', serif; }
 ```
 
 ---
 
 ## 荆南缘默体
 
-- **font-family**: `荆南缘默体`
+- **font-family**: `Kingnamype Yuanmo SC` （⚠️ 实测：CSS 实际声明为英文 ID）
 - **风格**: 沉稳静谧，书法韵味浓厚，适合高端文化/禅意/茶道类场景
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/133/
@@ -170,14 +151,14 @@ h1 { font-family: '猫啃网风雅宋', serif; }
 ```
 
 ```css
-h1 { font-family: '荆南缘默体', serif; }
+h1 { font-family: 'Kingnamype Yuanmo SC', serif; }
 ```
 
 ---
 
 ## 江西拙楷
 
-- **font-family**: `江西拙楷`
+- **font-family**: `jiangxizhuokai` （⚠️ 实测：CSS 实际声明为小写英文 ID）
 - **风格**: 拙朴自然的手写楷书，不做作不刻意，适合文艺/个人博客/手作风
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/474/
@@ -189,14 +170,14 @@ h1 { font-family: '荆南缘默体', serif; }
 ```
 
 ```css
-h1 { font-family: '江西拙楷', serif; }
+h1 { font-family: 'jiangxizhuokai', serif; }
 ```
 
 ---
 
 ## 女书梧桐
 
-- **font-family**: `女书梧桐`
+- **font-family**: `Nyushu Firmia` （⚠️ 实测：CSS 实际声明为英文 ID）
 - **风格**: 基于女书文化设计，纤细优雅，充满神秘的文化底蕴
 - **来源**: ZeoSeven
 - **原址**: https://fonts.zeoseven.com/items/268/
@@ -208,5 +189,15 @@ h1 { font-family: '江西拙楷', serif; }
 ```
 
 ```css
-h1 { font-family: '女书梧桐', serif; }
+h1 { font-family: 'Nyushu Firmia', serif; }
 ```
+
+---
+
+## 已移除
+
+### 思源屏显臻宋
+
+- 原 CDN 已失效
+- 暂未找到可替代 WebFont CDN
+- 已从 skill 中移除
