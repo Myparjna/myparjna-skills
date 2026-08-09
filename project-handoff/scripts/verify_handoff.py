@@ -5,13 +5,35 @@ import json
 import re
 import sys
 
+from _handoff_common import force_utf8_console
+
 ROOT = Path.cwd()
 OUT = ROOT / "ProjectDoc"
 REPORT_PATH = OUT / "analysis-report.json"
 
 # 必需文档列表
-REQUIRED_DOCS = {"README.md", "ENVIRONMENT.md", "DEPLOYMENT.md"}
-MIN_DOC_COUNT = 5
+REQUIRED_DOCS = {"README.md", "USAGE.md", "ARCHITECTURE.md", "MODULES.md",
+                 "ENVIRONMENT.md", "DEPLOYMENT.md", "REGRESSION-TEST.md"}
+MIN_DOC_COUNT = 9
+
+# 每份生成文档必须保留的核心章节（骨架基线），防止删除章节绕过 TODO 检查
+REQUIRED_SECTIONS = {
+    "README.md": ["待确认问题", "项目简介", "核心功能", "技术栈", "快速启动", "文档导航"],
+    "USAGE.md": ["适用角色与入口", "核心使用流程", "启动与停止"],
+    "ARCHITECTURE.md": ["架构总览", "目录结构", "技术选型与路线"],
+    "MODULES.md": ["模块总览", "模块职责矩阵", "关键调用链"],
+    "ENVIRONMENT.md": ["变量清单", "密钥轮换"],
+    "DEPLOYMENT.md": ["首次完整部署演练"],
+    "INFRASTRUCTURE.md": ["域名与 DNS", "第三方服务账号清单"],
+    "REGRESSION-TEST.md": ["测试现状", "回归范围", "发布前最小回归清单", "已知测试缺口"],
+    "KNOWN-ISSUES.md": ["已知 Bug", "技术债"],
+    "MAINTENANCE.md": ["监控与日志", "例行检查清单"],
+    "RUNBOOK.md": ["回滚", "常见故障处置"],
+    "AI-SERVICES.md": ["使用的 SDK", "计费与限额"],
+    "API.md": ["接口清单（扫描所得）", "鉴权"],
+    "DATABASE.md": ["概况", "数据模型", "备份与恢复"],
+    "DESKTOP.md": [],
+}
 
 # 真实密钥特征（高置信度模式，避免误报变量名）
 SECRET_PATTERNS = [
@@ -25,7 +47,7 @@ SECRET_PATTERNS = [
     (r"eyJhbGciOi[a-zA-Z0-9_.-]{40,}", "JWT"),
     (r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----", "私钥"),
     # 中国云厂商
-    (r"(?i)(?:LTAI|LTAI)[a-zA-Z0-9]{12,}", "阿里云 AccessKey"),
+    (r"(?i)LTAI[a-zA-Z0-9]{12,}", "阿里云 AccessKey"),
     (r"(?i)AKID[a-zA-Z0-9]{13,}", "腾讯云 SecretId"),
     (r"(?i)AKSK[a-zA-Z0-9]{13,}", "腾讯云 SecretKey"),
     # Cloudflare
@@ -63,7 +85,19 @@ TODO_VARIANTS = re.compile(
     re.IGNORECASE,
 )
 
-ALLOWED_UNCONFIRMED = re.compile(r"\[需向交接人确认:[^\]]+\]")
+ALLOWED_UNCONFIRMED = re.compile(r"\[需向交接人确认[:：][^\]]+\]")
+
+# 占位符/掩码特征：命中密钥正则但值明显是示例/脱敏时降级为 WARN
+_PLACEHOLDER_HINT = re.compile(
+    r"(?i)(your[-_]|example|sample|placeholder|xxx|asterisk|redacted|masked|<[^>]*>"
+    r"|\*{4}|\.{4}|replace[- ]?me|changeme|change[- ]?me|todo|dummy|fake|test[-_]?key)")
+
+
+def _is_placeholder(match_text, context):
+    """判断密钥模式命中的内容是否为示例值/掩码而非真实密钥。"""
+    if _PLACEHOLDER_HINT.search(match_text):
+        return True
+    return bool(_PLACEHOLDER_HINT.search(context))
 
 
 def load_report():
@@ -84,11 +118,18 @@ def check_doc(path: Path, report):
         elif TODO_VARIANTS.search(line):
             issues.append(("WARN", f"L{i}: 疑似 TODO 变体（可能绕过检测）: {line.strip()[:60]}"))
 
-    # 2. 密钥泄露（最高级别）
+    # 2. 密钥泄露（最高级别；同一行内的示例值/掩码降级为 WARN，
+    #    上下文只取命中所在行，避免相邻行的 .env.example 等字样污染判定）
     for pattern, label in SECRET_PATTERNS:
         for m in re.finditer(pattern, text):
             ln = text[:m.start()].count("\n") + 1
-            issues.append(("CRITICAL", f"L{ln}: 疑似泄露真实密钥（{label}）—— 必须移除，改为'通过安全渠道交接'"))
+            line_start = text.rfind("\n", 0, m.start()) + 1
+            line_end = text.find("\n", m.end())
+            context = text[line_start:len(text) if line_end == -1 else line_end]
+            if _is_placeholder(m.group(0), context):
+                issues.append(("WARN", f"L{ln}: 疑似示例/掩码值命中密钥特征（{label}），人工确认非真实密钥: {m.group(0)[:30]}..."))
+            else:
+                issues.append(("CRITICAL", f"L{ln}: 疑似泄露真实密钥（{label}）—— 必须移除，改为'通过安全渠道交接'"))
 
     # 3. 编造/敷衍痕迹
     for pattern, label in WEASEL_PATTERNS:
@@ -110,14 +151,24 @@ def check_doc(path: Path, report):
             if not body:
                 issues.append(("ERROR", f"空章节: {line.strip()}"))
 
-    # 5. 文档中引用的文件路径必须真实存在
+    # 5. 文档中引用的文件路径必须真实存在（不再用全盘 rglob 兜底；
+    #    扫描器 key_files_to_read 中的路径作为白名单，兼容相对根写法差异）
+    key_files = set()
+    for k in report.get("key_files_to_read", []):
+        item = str(k).replace("\\", "/")
+        while item.startswith("./"):
+            item = item[2:]
+        key_files.add(item)
     for m in re.finditer(r"`([\w./-]+\.(?:py|ts|tsx|js|jsx|json|toml|yaml|yml|env|md|prisma|sql|go|rs|rb|java|kt))`", text):
-        ref = m.group(1).lstrip("./")
+        ref = m.group(1)
+        while ref.startswith("./"):
+            ref = ref[2:]
         if ref.startswith(("ProjectDoc/", "http")) or "*" in ref:
             continue
-        if not (ROOT / ref).exists() and not list(ROOT.glob(f"**/{Path(ref).name}")):
-            ln = text[:m.start()].count("\n") + 1
-            issues.append(("WARN", f"L{ln}: 引用的文件不存在: `{ref}`（确认是否编造）"))
+        if (ROOT / ref).exists() or ref in key_files:
+            continue
+        ln = text[:m.start()].count("\n") + 1
+        issues.append(("WARN", f"L{ln}: 引用的文件不存在: `{ref}`（确认是否编造）"))
 
     return issues, text
 
@@ -137,14 +188,29 @@ def check_doc_count(docs):
     return issues
 
 
+def check_required_sections(docs):
+    """每份文档必须保留骨架核心章节，防止删除章节绕过 TODO 检查。"""
+    issues = []
+    for path in docs:
+        required = REQUIRED_SECTIONS.get(path.name)
+        if required is None:
+            continue
+        text = path.read_text(encoding="utf-8")
+        for title in required:
+            if not re.search(r"^##\s+" + re.escape(title) + r"\s*$", text, re.MULTILINE):
+                issues.append(("ERROR", f"{path.name}: 缺少必需章节 '## {title}'（不得通过删除章节绕过 TODO 检查）"))
+    return issues
+
+
 def check_residual_docs(docs, report):
     """检查是否有上次运行残留的多余文档。"""
     issues = []
     # 生成器应该产出的文档列表
-    expected = {"README.md", "ARCHITECTURE.md", "ENVIRONMENT.md", "DEPLOYMENT.md",
-                "INFRASTRUCTURE.md", "KNOWN-ISSUES.md", "MAINTENANCE.md", "RUNBOOK.md"}
+    expected = {"README.md", "USAGE.md", "ARCHITECTURE.md", "MODULES.md",
+                "ENVIRONMENT.md", "DEPLOYMENT.md", "INFRASTRUCTURE.md",
+                "REGRESSION-TEST.md", "KNOWN-ISSUES.md", "MAINTENANCE.md", "RUNBOOK.md"}
     ai = report.get("ai_services", {})
-    if ai.get("sdks") or ai.get("endpoints"):
+    if ai.get("sdks") or ai.get("endpoints") or ai.get("model_names"):
         expected.add("AI-SERVICES.md")
     if report.get("api_routes"):
         expected.add("API.md")
@@ -154,7 +220,7 @@ def check_residual_docs(docs, report):
         expected.add("DESKTOP.md")
 
     actual = {p.name for p in docs}
-    residual = actual - expected - {"analysis-report.json", "ProjectDoc-package.zip"}
+    residual = actual - expected - {"analysis-report.json"}
     if residual:
         issues.append(("WARN", f"发现可能的残留文档: {', '.join(residual)}（上次运行遗留？）"))
     return issues
@@ -186,6 +252,10 @@ def check_coverage(report, all_text):
         if not re.search(r"\b" + re.escape(s["sdk"]) + r"\b", all_text) and \
            not re.search(r"\b" + re.escape(s["package"]) + r"\b", all_text):
             issues.append(("WARN", f"AI SDK `{s['package']}` 未在文档中说明用途"))
+    for script in report.get("testing", {}).get("test_scripts", []):
+        name = script.get("name", "")
+        if name and not re.search(r"\b" + re.escape(name) + r"\b", all_text):
+            issues.append(("WARN", f"测试脚本 `{name}` 未在 REGRESSION-TEST.md 中说明"))
     return issues
 
 
@@ -239,6 +309,7 @@ def main():
 
     print("\n— 文档结构检查 —")
     struct_issues = check_doc_count(docs)
+    struct_issues += check_required_sections(docs)
     for sev, msg in struct_issues:
         total[sev] += 1
         print(f"    [{sev}] {msg}")
@@ -275,7 +346,7 @@ def main():
         print(f"\n— 待确认标记汇总（{len(unconfirmed_all)} 处） —")
         for item in unconfirmed_all:
             print(f"    - {item}")
-        print("    [INFO] 待确认标记是合法交接事项，不阻止打包；请交接人后续逐项确认。")
+        print("    [INFO] 待确认标记是合法交接事项，不阻止交付；请交接人后续逐项确认。")
 
     print(f"\n汇总: CRITICAL={total['CRITICAL']}  ERROR={total['ERROR']}  WARN={total['WARN']}")
     if total["CRITICAL"]:
@@ -284,8 +355,16 @@ def main():
     if total["ERROR"]:
         print("结论: 未通过。修复所有 ERROR 后重新运行。")
         sys.exit(1)
+    state_dir = OUT / ".handoff"
+    state_dir.mkdir(exist_ok=True)
+    verified_report = state_dir / "analysis-report.verified.json"
+    verified_report.write_text(REPORT_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"已更新增量基线: {verified_report.relative_to(ROOT)}")
     print("结论: 通过。WARN 项建议人工复核一遍。")
 
+
+# Windows GBK 控制台处理统一收拢到公共模块
+force_utf8_console()
 
 if __name__ == "__main__":
     main()

@@ -2,24 +2,29 @@
 """Scan the project and emit ProjectDoc/analysis-report.json for handoff doc generation."""
 from pathlib import Path
 from datetime import datetime, timezone
-import io
+import argparse
+import hashlib
 import json
 import math
+import os
 import re
 import subprocess
 import sys
 
+from _handoff_common import force_utf8_console
+
 ROOT = Path.cwd()
 OUT_DIR = ROOT / "ProjectDoc"
-TOOL_VERSION = "2.5.0"
-SCHEMA_VERSION = 2
+TOOL_VERSION = "3.0.0"
+SCHEMA_VERSION = 3
 
 # --- 配置（可被 .handoff.yml 覆盖） ---
 SKIP_DIRS = {
     "node_modules", ".git", "dist", "build", ".next", ".nuxt", "out",
     "__pycache__", ".venv", "venv", "env", ".turbo", "coverage", ".cache",
     "target", "vendor", ".pytest_cache", ".mypy_cache", "ProjectDoc",
-    ".mypy_cache", ".ruff_cache", ".tox", ".nox", ".eggs", ".pythonlibs",
+    "TempScr", "TempFiles", "ScreenShot",
+    ".ruff_cache", ".tox", ".nox", ".eggs", ".pythonlibs",
     "__pypackages__", "site-packages", "dist-packages", "egg-info",
     "pip-wheel-metadata", ".hypothesis", ".ipynb_checkpoints",
 }
@@ -37,7 +42,25 @@ GREP_FILENAMES = {
 }
 MAX_FILE_SIZE = 512_000
 MAX_GREP_FILES = 3000
+MAX_KEY_FILES = 40
 INCLUDE_DIRS = []
+# 默认跳过所有隐藏目录，但以下隐藏目录含交接关键事实（CI、agent 配置），需进入扫描
+HIDDEN_DIR_ALLOWLIST = {
+    ".github", ".circleci", ".claude", ".agents", ".cursor", ".vscode", ".idea",
+    ".devcontainer", ".husky", ".vercel", ".netlify",
+}
+# 配置文件类，截断时优先保留，避免被大量源码挤出
+PRIORITY_SUFFIXES = {".yml", ".yaml", ".toml", ".json", ".md"}
+
+_SKIP_LOWER_CACHE = None
+
+
+def _skip_dirs_lower():
+    """缓存小写跳过集合，避免每次 is_skipped_path 都重建。"""
+    global _SKIP_LOWER_CACHE
+    if _SKIP_LOWER_CACHE is None or len(_SKIP_LOWER_CACHE) != len(SKIP_DIRS):
+        _SKIP_LOWER_CACHE = {name.lower() for name in SKIP_DIRS}
+    return _SKIP_LOWER_CACHE
 
 
 def load_config():
@@ -79,8 +102,13 @@ def read_text(path: Path) -> str:
 
 def is_skipped_path(path: Path) -> bool:
     """Return True for generated, dependency, cache, and virtualenv paths."""
-    parts = [part.lower() for part in path.parts]
-    skip = {name.lower() for name in SKIP_DIRS}
+    # 只看相对 ROOT 的路径段：项目根目录及其祖先（即使项目位于 dist/TempFiles
+    # 等名字的目录下）不参与跳过判定
+    try:
+        parts = [part.lower() for part in path.relative_to(ROOT).parts]
+    except ValueError:
+        parts = [part.lower() for part in path.parts]
+    skip = _skip_dirs_lower()
     if any(part in skip for part in parts):
         return True
     if any(part.endswith((".egg-info", ".dist-info")) for part in parts):
@@ -139,7 +167,9 @@ def iter_files():
             continue
         for path in entries:
             if path.is_dir():
-                if not is_skipped_path(path) and not path.name.startswith("."):
+                if not is_skipped_path(path) and (
+                    not path.name.startswith(".") or path.name.lower() in HIDDEN_DIR_ALLOWLIST
+                ):
                     stack.append(path)
             elif path.is_file():
                 count += 1
@@ -151,16 +181,44 @@ def iter_files():
 
 
 def collect_source_texts():
-    """(relative_path, content) pairs for grep-based detection."""
-    texts = []
+    """(relative_path, content) pairs for grep-based detection.
+
+    超出 MAX_GREP_FILES 时按"配置/manifest 文件优先"排序后截断，
+    而不是按遍历顺序直接丢弃，返回 (texts, truncated)。
+    """
+    matched = []
     for path in iter_files():
         if path.suffix.lower() in GREP_EXT or path.name in GREP_FILENAMES:
-            content = read_text(path)
-            if content:
-                texts.append((rel_path(path), content))
-            if len(texts) >= MAX_GREP_FILES:
-                break
-    return texts
+            matched.append(path)
+    truncated = len(matched) > MAX_GREP_FILES
+    if truncated:
+        if sys.stderr.isatty():
+            sys.stderr.write(f"\n[warn] 候选文本文件 {len(matched)} 个超过上限 {MAX_GREP_FILES}，已优先保留配置/manifest 文件\n")
+        matched.sort(key=lambda p: (
+            0 if (p.name in GREP_FILENAMES or p.suffix.lower() in PRIORITY_SUFFIXES) else 1,
+            rel_path(p),
+        ))
+        matched = matched[:MAX_GREP_FILES]
+    texts = []
+    for path in matched:
+        content = read_text(path)
+        if content:
+            texts.append((rel_path(path), content))
+    return texts, truncated
+
+
+def count_total_files():
+    """统计非跳过目录下的文件总数（带目录剪枝，避免 rglob 遍历 .git/node_modules）。"""
+    total = 0
+    skip = _skip_dirs_lower()
+    for root_dir, dirs, files in os.walk(ROOT):
+        dirs[:] = [
+            d for d in dirs
+            if d.lower() not in skip and not d.endswith((".egg-info", ".dist-info"))
+            and (not d.startswith(".") or d.lower() in HIDDEN_DIR_ALLOWLIST)
+        ]
+        total += len(files)
+    return total
 
 
 def grep(texts, pattern, group=0):
@@ -608,22 +666,31 @@ def detect_env_vars(texts):
     for root in [ROOT, *scan_roots()]:
         if root not in seen_env_roots:
             seen_env_roots.append(root)
+    # 模板文件展示默认值；其余真实 env 文件只取变量名，值一律脱敏
+    template_names = {".env.example", ".env.sample", ".env.template"}
+    env_names = (".env.example", ".env.sample", ".env.template", ".env",
+                 ".env.local", ".env.development", ".env.staging",
+                 ".env.test", ".env.production")
     for root in seen_env_roots:
-        for name in (".env.example", ".env.sample", ".env.template", ".env"):
+        for name in env_names:
             path = root / name
             if not path.exists():
                 continue
             source = rel_path(path)
             for line in read_text(path).splitlines():
                 line = line.strip()
-                if name in (".env.example", ".env.sample", ".env.template") and line.startswith("#"):
+                if line.startswith("#"):
+                    if name not in template_names:
+                        continue  # 真实 env 文件的注释不解析
                     line = line[1:].strip()
-                if line and not line.startswith("#") and "=" in line:
+                if line and "=" in line:
                     key, _, value = line.partition("=")
                     key = key.strip()
                     if re.match(r"^[A-Z][A-Z0-9_]*$", key) and key not in declared:
-                        declared[key] = {"source": source,
-                                         "default": value.strip() if name != ".env" else "<redacted: real .env>"}
+                        declared[key] = {
+                            "source": source,
+                            "default": value.strip() if name in template_names else "<redacted: real env file>",
+                        }
     used = set()
     used_locations = {}
 
@@ -683,7 +750,7 @@ def detect_env_vars(texts):
     }
 
 
-def detect_database(node_deps, py_deps):
+def detect_database(node_deps, py_deps, cloudflare):
     result = {"clients": [], "orm": [], "migrations": []}
     client_map = {"pg": "PostgreSQL", "mysql2": "MySQL", "better-sqlite3": "SQLite", "sqlite3": "SQLite",
                   "mongodb": "MongoDB", "mongoose": "MongoDB (Mongoose)", "redis": "Redis", "ioredis": "Redis",
@@ -692,15 +759,32 @@ def detect_database(node_deps, py_deps):
     for dep, label in client_map.items():
         if dep in node_deps or dep in py_deps:
             result["clients"].append(label)
+    # Cloudflare D1（wrangler 绑定）也是数据库，单独依赖检测不到
+    if cloudflare.get("wrangler", {}).get("d1_databases"):
+        result["clients"].append("Cloudflare D1")
     for dep in ("prisma", "drizzle-orm", "typeorm", "sequelize", "sqlalchemy", "tortoise-orm", "peewee"):
         if dep in node_deps or dep in py_deps:
             result["orm"].append(dep)
-    schema = ROOT / "prisma" / "schema.prisma"
-    if schema.exists():
+    # prisma schema 不限根目录，兼容 monorepo 子包
+    schema = next(
+        (p for depth in ("", "*/", "*/*/")
+         for p in ROOT.glob(depth + "prisma/schema.prisma")
+         if p.exists() and not is_skipped_path(p)),
+        None,
+    )
+    if schema:
+        result["prisma_schema"] = rel_path(schema)
         result["prisma_models"] = re.findall(r"^model\s+(\w+)", read_text(schema), re.MULTILINE)
-    for name in ("migrations", "alembic", "prisma/migrations"):
-        if (ROOT / name).is_dir():
-            result["migrations"].append(name)
+        prisma_migrations = schema.parent / "migrations"
+        if prisma_migrations.is_dir():
+            result["migrations"].append(rel_path(prisma_migrations))
+    for name in ("migrations", "alembic"):
+        for depth in ("", "*/", "*/*/"):
+            for path in ROOT.glob(depth + name):
+                if path.is_dir() and not is_skipped_path(path):
+                    rel = rel_path(path)
+                    if rel not in result["migrations"]:
+                        result["migrations"].append(rel)
     result["clients"] = sorted(set(result["clients"]))
     return result
 
@@ -810,6 +894,20 @@ def detect_api_routes(texts):
                 if route.startswith("/"):
                     routes.append(f"{method.upper()} {route}  ({rel})")
     return sorted(set(routes))[:80]
+
+
+def detect_api_specs():
+    """检测 OpenAPI/Swagger 规范文件。"""
+    names = ("openapi.json", "openapi.yaml", "openapi.yml", "swagger.json", "swagger.yaml", "swagger.yml")
+    specs = []
+    for depth in ("", "*/", "*/*/"):
+        for name in names:
+            for path in ROOT.glob(depth + name):
+                if path.is_file() and not is_skipped_path(path):
+                    rel = rel_path(path)
+                    if rel not in specs:
+                        specs.append(rel)
+    return specs
 
 
 def detect_lan_startup(texts, node_scripts):
@@ -978,6 +1076,8 @@ def detect_dev_platform():
     checks = {
         ".vscode": "VS Code", ".idea": "JetBrains IDE",
         "CLAUDE.md": "Claude Code", ".claude": "Claude Code",
+        "AGENTS.md": "Codex / AGENTS.md",
+        "GEMINI.md": "Gemini CLI",
         ".cursorrules": "Cursor", ".cursor": "Cursor",
         ".windsurfrules": "Windsurf", ".trae": "Trae",
         ".github/copilot-instructions.md": "GitHub Copilot",
@@ -1033,6 +1133,115 @@ def detect_monitoring(node_deps, py_deps):
         if dep in node_deps or dep in py_deps:
             found.append({"package": dep, "service": label})
     return found
+
+
+def detect_deployment_targets(node_deps):
+    """检测 Vercel / Netlify / VPS(systemd/pm2/nginx) 部署痕迹，供 DEPLOYMENT.md 生成章节。"""
+    result = {"vercel": [], "netlify": [], "vps": []}
+
+    # Vercel
+    if (ROOT / "vercel.json").exists():
+        result["vercel"].append("vercel.json")
+    if (ROOT / ".vercel").is_dir():
+        result["vercel"].append(".vercel/ (本地部署缓存)")
+    if "vercel" in node_deps:
+        result["vercel"].append("vercel (依赖)")
+
+    # Netlify
+    for name in ("netlify.toml", "netlify.yml", "netlify.yaml"):
+        if (ROOT / name).exists():
+            result["netlify"].append(name)
+    if "netlify-cli" in node_deps:
+        result["netlify"].append("netlify-cli (依赖)")
+
+    # VPS / 自建：systemd unit、pm2 ecosystem、nginx 配置、supervisord
+    unit_files = []
+    pm2_files = []
+    nginx_files = []
+    supervisord_files = []
+    for depth in ("", "*/", "*/*/"):
+        for path in ROOT.glob(depth + "*"):
+            if not path.is_file() or is_skipped_path(path):
+                continue
+            rel = rel_path(path)
+            name = path.name
+            if name.endswith(".service") and rel.startswith(("deploy/", "ops/", "infra/", "config/")):
+                unit_files.append(rel)
+            elif name in ("ecosystem.config.js", "ecosystem.config.cjs", "ecosystem.config.ts",
+                          "pm2.json", "process.json"):
+                pm2_files.append(rel)
+            elif name in ("nginx.conf", "default.conf") or (
+                name.endswith(".conf") and rel.startswith(("deploy/", "ops/", "infra/", "config/"))
+            ):
+                nginx_files.append(rel)
+            elif name == "supervisord.conf":
+                supervisord_files.append(rel)
+    if unit_files:
+        result["vps"].append("systemd unit: " + ", ".join(sorted(unit_files)[:5]))
+    if pm2_files:
+        result["vps"].append("pm2 ecosystem: " + ", ".join(sorted(pm2_files)[:5]))
+    if nginx_files:
+        result["vps"].append("nginx: " + ", ".join(sorted(nginx_files)[:5]))
+    if supervisord_files:
+        result["vps"].append("supervisord: " + ", ".join(sorted(supervisord_files)[:5]))
+
+    return result
+
+
+def detect_testing(node_scripts):
+    """Collect regression-test entry points without executing project code."""
+    config_names = (
+        "pytest.ini", "tox.ini", "noxfile.py", "conftest.py", "vitest.config.ts",
+        "vitest.config.js", "jest.config.js", "jest.config.ts", "playwright.config.ts",
+        "playwright.config.js", "cypress.config.ts", "cypress.config.js", "CTestTestfile.cmake",
+    )
+    configs = [name for name in config_names if (ROOT / name).exists()]
+    test_dirs = [name for name in ("tests", "test", "e2e", "cypress", "spec", "integration")
+                 if (ROOT / name).is_dir()]
+    scripts = []
+    for rel, entries in node_scripts.items():
+        for name, command in entries.items():
+            if any(token in name.lower() for token in ("test", "e2e", "spec", "check")):
+                scripts.append({"source": rel, "name": name, "command": command})
+
+    patterns = ("test_*.py", "*_test.py", "*.spec.ts", "*.test.ts", "*.spec.js", "*.test.js",
+                "*.spec.tsx", "*.test.tsx", "*_test.go", "*_test.rs", "*Tests.cs", "*Test.java")
+    test_files = []
+    for root in scan_roots():
+        for pattern in patterns:
+            for path in root.rglob(pattern):
+                if path.is_file() and not is_skipped_path(path):
+                    test_files.append(rel_path(path))
+                    if len(test_files) >= 200:
+                        break
+            if len(test_files) >= 200:
+                break
+        if len(test_files) >= 200:
+            break
+    return {
+        "config_files": sorted(set(configs)),
+        "test_directories": sorted(set(test_dirs)),
+        "test_scripts": scripts,
+        "test_files": sorted(set(test_files)),
+        "test_file_count": len(set(test_files)),
+    }
+
+
+def fingerprint_key_files(paths):
+    fingerprints = {}
+    for rel in paths:
+        path = ROOT / rel
+        try:
+            data = path.read_bytes()
+            stat = path.stat()
+        except OSError:
+            continue
+        fingerprints[rel] = {
+            "sha256": hashlib.sha256(data).hexdigest(),
+            "size": stat.st_size,
+            "modified_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+        }
+    return fingerprints
 
 
 def git_info():
@@ -1092,9 +1301,12 @@ def build_key_files(report):
     seen = set()
 
     def add_file(rel):
-        if not rel:
+        if not rel or len(files) >= MAX_KEY_FILES:
             return
-        rel = str(rel).strip().strip("`").replace("\\", "/").lstrip("./")
+        rel = str(rel).strip().strip("`").replace("\\", "/")
+        # 逐段剥离 ./ 前缀；不能用 lstrip("./")（会把 .env.example 等剥坏）
+        while rel.startswith("./"):
+            rel = rel[2:]
         if not rel or rel.startswith(("http://", "https://")):
             return
         path = ROOT / rel
@@ -1143,18 +1355,22 @@ def build_key_files(report):
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--no-baseline", action="store_true",
+                        help="Do not preserve the current analysis report as the comparison baseline")
+    args = parser.parse_args()
     load_config()
 
     # 统计文件总数（用于扫描完整性报告）
-    total_files = sum(1 for root in scan_roots() for _ in root.rglob("*") if _.is_file() and not is_skipped_path(_))
+    total_files = count_total_files()
 
-    texts = collect_source_texts()
+    texts, truncated = collect_source_texts()
     scanned_count = len(texts)
-    truncated = scanned_count >= MAX_GREP_FILES
 
     manifests = find_manifests()
     node_deps, node_scripts = load_node_deps(manifests["package_json"])
     py_deps = load_python_deps(manifests["requirements"], manifests["pyproject"])
+    cloudflare = detect_cloudflare()
 
     report = {
         "schema_version": SCHEMA_VERSION,
@@ -1167,21 +1383,24 @@ def main() -> None:
         "ui_libraries": detect_ui_libraries(node_deps),
         "desktop": detect_desktop(node_deps, manifests["csproj"]),
         "docker": detect_docker(),
-        "cloudflare": detect_cloudflare(),
+        "cloudflare": cloudflare,
         "ci_cd": detect_ci_cd(),
         "kubernetes": detect_kubernetes(),
+        "deployment_targets": detect_deployment_targets(node_deps),
         "ai_services": detect_ai_services(node_deps, py_deps, texts),
         "external_resources": detect_external_resources(node_deps, texts),
         "environment_variables": detect_env_vars(texts),
-        "database": detect_database(node_deps, py_deps),
+        "database": detect_database(node_deps, py_deps, cloudflare),
         "native_embedded_ai": detect_native_embedded_ai(texts),
         "api_routes": detect_api_routes(texts),
+        "api_specs": detect_api_specs(),
         "lan_startup": detect_lan_startup(texts, node_scripts),
         "frontend_mock": detect_mock(node_deps),
         "dev_platform": detect_dev_platform(),
         "mcp_servers": detect_mcp_servers(),
         "wsl_dependency": detect_wsl_dependency(texts),
         "monitoring": detect_monitoring(node_deps, py_deps),
+        "testing": detect_testing(node_scripts),
         "npm_scripts": node_scripts,
         "dependency_counts": {"node": len(node_deps), "python": len(py_deps)},
         "git": git_info(),
@@ -1194,11 +1413,20 @@ def main() -> None:
         },
     }
     report["key_files_to_read"] = build_key_files(report)
+    report["key_file_fingerprints"] = fingerprint_key_files(report["key_files_to_read"])
 
     report_str = json.dumps(report, indent=2, ensure_ascii=False)
 
     OUT_DIR.mkdir(exist_ok=True)
     out = OUT_DIR / "analysis-report.json"
+    state_dir = OUT_DIR / ".handoff"
+    baseline = state_dir / "analysis-report.previous.json"
+    verified = state_dir / "analysis-report.verified.json"
+    if not args.no_baseline and (verified.exists() or (out.exists() and not baseline.exists())):
+        state_dir.mkdir(exist_ok=True)
+        source = verified if verified.exists() else out
+        baseline.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"Previous verified report preserved at {baseline.relative_to(ROOT)}")
     out.write_text(report_str, encoding="utf-8")
 
     print(f"Report written to {out.relative_to(ROOT)}")
@@ -1207,8 +1435,11 @@ def main() -> None:
     print(f"- Frameworks: {[f['name'] for f in report['frameworks']] or 'none detected'}")
     print(f"- UI libraries: {[u['name'] for u in report['ui_libraries']] or 'none'}")
     print(f"- Desktop: {[d['type'] for d in report['desktop']] or 'none'}")
-    print(f"- CI/CD: GitHub={len(report['ci_cd']['github_actions'])}, GitLab={len(report['ci_cd']['gitlab_ci'])}, Jenkins={len(report['ci_cd']['jenkins'])}")
+    print(f"- CI/CD: GitHub={len(report['ci_cd']['github_actions'])}, GitLab={len(report['ci_cd']['gitlab_ci'])}, "
+          f"Jenkins={len(report['ci_cd']['jenkins'])}, CircleCI={len(report['ci_cd']['circleci'])}")
     print(f"- K8s resources: {len(report['kubernetes']['resources'])}")
+    targets = report["deployment_targets"]
+    print(f"- Deployment targets: Vercel={len(targets['vercel'])}, Netlify={len(targets['netlify'])}, VPS={len(targets['vps'])}")
     print(f"- AI SDKs: {[s['sdk'] for s in report['ai_services']['sdks']] or 'none'}")
     print(f"- Env vars declared/used: {len(report['environment_variables']['declared'])}/{len(report['environment_variables']['used_in_code'])}")
     print(f"- High entropy env values: {len(report['environment_variables']['high_entropy_values'])}")
@@ -1219,17 +1450,12 @@ def main() -> None:
     print(f"- WSL dependency: {report['wsl_dependency']['uses_wsl']} ({len(report['wsl_dependency']['evidence'])} evidence)")
     print(f"- Claude skills: {report['dev_platform']['claude_skills']['all'] or 'none'}")
     print(f"- Scan: {scanned_count}/{total_files} files" + (" (TRUNCATED)" if truncated else ""))
+    print(f"- Tests: {report['testing']['test_file_count']} files; scripts={[s['name'] for s in report['testing']['test_scripts']] or 'none'}")
     print(f"- MUST READ files: {report['key_files_to_read']}")
 
 
-# Windows GBK 控制台无法输出 emoji/特殊 Unicode，强制 UTF-8
-if sys.platform == "win32":
-    for _stream_name in ("stdout", "stderr"):
-        _stream = getattr(sys, _stream_name)
-        if hasattr(_stream, "reconfigure"):
-            _stream.reconfigure(encoding="utf-8", errors="replace")
-        else:
-            setattr(sys, _stream_name, io.TextIOWrapper(_stream.buffer, encoding="utf-8", errors="replace"))
+# Windows GBK 控制台处理统一收拢到公共模块
+force_utf8_console()
 
 if __name__ == "__main__":
     main()

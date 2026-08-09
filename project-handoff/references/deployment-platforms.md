@@ -53,6 +53,19 @@
 - Runner 配置
 - Artifacts 和 Cache 配置
 
+## CircleCI
+
+- 各 job/workflow 的作用和触发条件
+- 环境变量在 CircleCI → Project Settings → Environment Variables 中的配置
+- Context 和 OIDC 配置（如有）
+- 失败时去哪看日志和 artifacts
+
+## Jenkins
+
+- Pipeline 的触发条件和 stage 作用
+- Credentials 在 Manage Jenkins → Credentials 中的配置
+- Agent/runner 配置（如有）
+
 ## Vercel
 
 - `vercel` CLI 登录和部署
