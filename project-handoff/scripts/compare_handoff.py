@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +15,7 @@ ROOT = Path.cwd()
 DOC_DIR = ROOT / "ProjectDoc"
 CURRENT_REPORT = DOC_DIR / "analysis-report.json"
 PREVIOUS_REPORT = DOC_DIR / ".handoff" / "analysis-report.previous.json"
+VERIFIED_REPORT = DOC_DIR / ".handoff" / "analysis-report.verified.json"
 
 DOC_FIELDS = {
     "README.md": {"project_name", "package_manager", "frameworks", "ui_libraries", "npm_scripts", "git"},
@@ -74,6 +76,50 @@ def fingerprint_changes(previous: dict, current: dict) -> dict:
     }
 
 
+def run_git(args: list[str]) -> str:
+    try:
+        r = subprocess.run(["git", *args], capture_output=True, timeout=15, cwd=ROOT)
+        if r.returncode != 0:
+            return ""
+        return r.stdout.decode("utf-8", errors="replace").strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def run_git_ok(args: list[str]) -> bool:
+    """只看退出码的命令（如 cat-file -e、rev-parse），无 stdout 也能判断成功。"""
+    try:
+        return subprocess.run(["git", *args], capture_output=True, timeout=15, cwd=ROOT).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def git_changes_since_baseline(previous: dict) -> dict:
+    """自上次验收基线以来的 git 变更：优先用基线记录的 commit hash，其次用基线生成时间。"""
+    result = {"available": False, "range": "", "commits": [], "diff_summary": "",
+              "changed_files": [], "uncommitted_count": 0}
+    if not run_git_ok(["rev-parse", "--is-inside-work-tree"]):
+        return result
+    base_hash = (previous.get("git") or {}).get("hash", "")
+    if base_hash and run_git_ok(["cat-file", "-e", base_hash]):
+        result["range"] = f"{base_hash}..HEAD"
+    else:
+        generated_at = previous.get("generated_at", "")
+        if not generated_at:
+            return result
+        result["range"] = f"--since={generated_at}"
+    log_args = ["log", "--date=short", "--format=%h %ad %s", result["range"], "-50"]
+    commits = [line for line in run_git(log_args).splitlines() if line.strip()]
+    result["commits"] = commits
+    result["available"] = True
+    if not result["range"].startswith("--since="):
+        result["diff_summary"] = run_git(["diff", "--shortstat", result["range"]])
+        changed = [line for line in run_git(["diff", "--name-only", result["range"]]).splitlines() if line.strip()]
+        result["changed_files"] = changed[:100]
+    result["uncommitted_count"] = len([line for line in run_git(["status", "--porcelain"]).splitlines() if line.strip()])
+    return result
+
+
 def make_plan(previous: dict, current: dict) -> dict:
     changed_fields = sorted(field for field in set(previous) | set(current)
                             if field not in {"generated_at", "tool_version", "key_file_fingerprints"}
@@ -132,6 +178,21 @@ def render_markdown(plan: dict) -> str:
     for label, key in (("新增", "added"), ("修改", "modified"), ("删除", "removed")):
         values = changes[key]
         lines.append(f"- {label}：" + (", ".join(f"`{value}`" for value in values) if values else "无"))
+    git = plan.get("git_changes", {})
+    lines.extend(["", "## 自上次验收基线以来的 Git 变更", ""])
+    if not git.get("available"):
+        lines.append("- 未获取到（非 git 仓库、无基线或基线 commit 不在当前历史中）。仅依赖上方的报告字段/指纹差异。")
+    else:
+        lines.append(f"- 范围：`{git['range']}`" + (f"，另有 {git['uncommitted_count']} 个未提交变更" if git.get("uncommitted_count") else "，无未提交变更"))
+        if git.get("diff_summary"):
+            lines.append(f"- 变更规模：{git['diff_summary']}")
+        if git.get("commits"):
+            lines.append("- Commit 列表（最多 50 条）：")
+            lines.extend(f"  - `{c}`" for c in git["commits"])
+        else:
+            lines.append("- Commit 列表：基线以来无新提交")
+        if git.get("changed_files"):
+            lines.append("- 变更文件（最多 100 个）：" + ", ".join(f"`{f}`" for f in git["changed_files"]))
     lines.extend(["", "## 文档建议", "", "| 文档 | 动作 | 原因 | 变化字段 |", "|---|---|---|---|"])
     for item in plan["recommendations"]:
         fields = ", ".join(f"`{field}`" for field in item["changed_report_fields"]) or "-"
@@ -150,7 +211,10 @@ def main() -> None:
         raise SystemExit("ERROR: 缺少 ProjectDoc/analysis-report.json，请先运行 analyze_project.py")
     current = load_json(CURRENT_REPORT)
     previous = load_json(PREVIOUS_REPORT)
+    # git 范围优先以最近一次验收通过的 verified 基线为准，其次才是 previous
+    git_baseline = load_json(VERIFIED_REPORT) or previous
     plan = make_plan(previous, current)
+    plan["git_changes"] = git_changes_since_baseline(git_baseline)
     output_dir = (ROOT / args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "project-handoff-update-plan.json"
@@ -162,6 +226,12 @@ def main() -> None:
     for item in plan["recommendations"]:
         counts[item["action"]] = counts.get(item["action"], 0) + 1
     print("- " + ", ".join(f"{key}={value}" for key, value in sorted(counts.items())))
+    git = plan["git_changes"]
+    if git.get("available"):
+        print(f"- git: {len(git['commits'])} 条新 commit（范围 {git['range']}）"
+              + (f"，{git['uncommitted_count']} 个未提交变更" if git["uncommitted_count"] else ""))
+    else:
+        print("- git: 未获取到基线以来的变更记录")
 
 
 if __name__ == "__main__":

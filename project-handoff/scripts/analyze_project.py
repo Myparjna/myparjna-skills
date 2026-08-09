@@ -15,7 +15,7 @@ from _handoff_common import force_utf8_console
 
 ROOT = Path.cwd()
 OUT_DIR = ROOT / "ProjectDoc"
-TOOL_VERSION = "3.0.0"
+TOOL_VERSION = "3.1.1"
 SCHEMA_VERSION = 3
 
 # --- 配置（可被 .handoff.yml 覆盖） ---
@@ -1254,6 +1254,7 @@ def git_info():
     return {
         "remote": run(["remote", "get-url", "origin"]),
         "branch": run(["rev-parse", "--abbrev-ref", "HEAD"]),
+        "hash": run(["rev-parse", "HEAD"]),
         "last_commit": run(["log", "-1", "--format=%h %ad %s", "--date=short"]),
         "commit_count": run(["rev-list", "--count", "HEAD"]),
         "contributors": run(["shortlog", "-sn", "--no-merges", "HEAD"]).splitlines()[:10],

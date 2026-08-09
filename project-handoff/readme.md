@@ -2,7 +2,7 @@
 
 为即将交接的项目生成完整、可验证的交接文档。基于源码静态分析提取事实，AI 只负责组织和补充说明，杜绝编造。
 
-当前版本：**3.0.0**（analysis-report schema 3）。
+当前版本：**3.1.1**（analysis-report schema 3）。
 
 触发词：`交接文档`、`更新交接文档`、`更新文档`、`查看交接文档`、`project handoff`、`handoff docs`。
 
@@ -15,12 +15,12 @@
 - 把个人 side project 转给团队
 - AI agent 交接项目上下文
 
-## 工作流程（8 步）
+## 工作流程（9 步）
 
 ```
-定位项目 → 判断模式 → 扫描并保留基线 → 生成比对建议
-       → 阅读旧文档和变更源码 → 创建/补齐骨架
-       → AI 原地增量修改 → 质量门禁
+定位项目 → 判断模式 → 扫描并保留基线 → 生成计划并交用户确认
+       → 生成比对建议（含 git 变更） → 阅读旧文档和变更源码
+       → 创建/补齐骨架 → AI 原地增量修改 → 质量门禁
 ```
 
 ### 步骤详解
@@ -34,20 +34,25 @@ python /absolute/path/to/project-handoff/scripts/discover_project.py --start . -
 python /absolute/path/to/project-handoff/scripts/analyze_project.py
 # 产出 ProjectDoc/analysis-report.json
 
-# 3. 生成机器差异和文档更新建议
+# 3. 生成交接计划：模式判定 + 文档生成/跳过清单 + 每份 focus + 扫描范围
+python /absolute/path/to/project-handoff/scripts/plan_handoff.py
+# 产出 TempScr/project-handoff-plan.md 和 .json；向用户展示并确认后再继续
+# 用户可直接编辑 plan 文件；generate 会自动读取并尊重 skip 决策
+
+# 4. 生成机器差异和文档更新建议（含自上次验收基线以来的 git commit 列表与变更文件统计）
 python /absolute/path/to/project-handoff/scripts/compare_handoff.py
 # 产出 TempScr/project-handoff-update-plan.md 和 .json
 
-# 4. AI 阅读旧文档和 key_files_to_read 中变化的关键文件（不可省略）
+# 5. AI 阅读旧文档和 key_files_to_read 中变化的关键文件（不可省略）
 #    理解项目业务目的、部署流程、环境变量用途、AI API 调用方式
 
-# 5. 更新模式只补齐缺失文档；已有文档保持原样
+# 6. 更新模式只补齐缺失文档；已有文档保持原样
 python /absolute/path/to/project-handoff/scripts/generate_handoff.py --mode update --client-level developer
 
-# 6. AI 按更新建议原地修改受影响章节，并补全新增文档中的 TODO(AI)
+# 7. AI 按更新建议原地修改受影响章节，并补全新增文档中的 TODO(AI)
 #    不确定的内容标记为 [需向交接人确认: 具体问题]
 
-# 7. 质量门禁
+# 8. 质量门禁
 python /absolute/path/to/project-handoff/scripts/verify_handoff.py
 # 退出码 0=通过  1=有 ERROR  2=检测到密钥泄露
 
@@ -59,7 +64,7 @@ python /absolute/path/to/project-handoff/scripts/verify_handoff.py
 | 文件 | 内容 |
 |---|---|
 | `ProjectDoc/analysis-report.json` | 静态分析事实清单（机器可读） |
-| `ProjectDoc/README.md` | 项目概览、技术栈、快速启动 |
+| `ProjectDoc/README.md` | 项目概览、技术栈、快速启动、速查卡（30 秒应急速览） |
 | `ProjectDoc/USAGE.md` | 用户角色、入口和核心使用流程 |
 | `ProjectDoc/ARCHITECTURE.md` | 架构图、目录结构、技术选型 |
 | `ProjectDoc/MODULES.md` | 模块职责、入口、依赖和关键调用链 |
@@ -81,6 +86,8 @@ python /absolute/path/to/project-handoff/scripts/verify_handoff.py
 2. **不知道 ≠ 编一个**：`[需向交接人确认: ...]` 是唯一合法的存疑写法，门禁对含糊措辞（"视情况而定"、"此处略"、占位符）直接报警。
 3. **密钥零容忍**：verify 用高置信度正则扫描真实密钥特征（sk-、ghp_、AKIA、私钥块等），命中即 CRITICAL，禁止交付；示例值/掩码命中时降级为 WARN 供人工确认。同时检测 .env 文件中的高熵值。文档只写密钥的名称、用途、获取方式和交接渠道。
 4. **防删章节绕过**：verify 内置骨架核心章节清单，删除章节逃避 TODO 检查会被 ERROR 拦截。
+5. **规划先行**：plan_handoff.py 先判定模式、列出文档生成/跳过清单与每份 focus，交用户确认后才生成。小项目可跳过非必需文档，避免被迫产出大量薄文档；大项目的特殊主题（合规、多租户等）记入计划 focus。
+6. **git 变更信号**：compare 输出自上次验收基线以来的 commit 列表与变更文件统计（以基线记录的 commit hash 为范围），与报告字段 diff/文件指纹互补，为 AI 语义判断提供素材。
 
 ## 支持的技术栈检测
 

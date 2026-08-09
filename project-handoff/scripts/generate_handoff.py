@@ -12,6 +12,21 @@ from _handoff_common import force_utf8_console
 ROOT = Path.cwd()
 OUT = ROOT / "ProjectDoc"
 REPORT_PATH = OUT / "analysis-report.json"
+DEFAULT_PLAN_PATH = ROOT / "TempScr" / "project-handoff-plan.json"
+
+
+def load_plan(plan_path: Path | None) -> dict:
+    """读取 handoff-plan（plan_handoff.py 产物），不存在时返回空计划。"""
+    path = plan_path or (DEFAULT_PLAN_PATH if DEFAULT_PLAN_PATH.exists() else None)
+    if path is None:
+        return {}
+    try:
+        plan = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        print(f"[WARN] 计划文件 {path} 解析失败，忽略该计划。")
+        return {}
+    print(f"已读取交接计划: {path}")
+    return plan
 
 
 def todo(instruction: str) -> str:
@@ -89,6 +104,16 @@ def doc_readme(r, level):
         section("快速启动",
                 "```bash\n" + todo("写出从 git clone 到本地跑起来的完整命令序列，逐条验证可行性（依据 npm_scripts 和 README）。包含：安装依赖、复制 .env、启动命令、访问地址") + "\n```",
                 f"**可用脚本**:\n{table(['命令', '用途'], [[f'`{k}`', todo('解释用途')] for s in r['npm_scripts'].values() for k in s][:12]) if r['npm_scripts'] else '无 npm scripts'}"),
+        section("速查卡",
+                table(["项目", "值", "出处/说明"], [
+                    ["本地访问地址", todo("端口和 URL，从启动配置/运行验证中获取"), "启动后实际访问入口"],
+                    ["生产访问入口", todo("生产 URL 或运行位置；未知写 [需向交接人确认: 生产入口]"), "用户/部署平台"],
+                    ["启动一行命令", todo("从快速启动中提炼最核心的一条命令"), "快速启动"],
+                    ["部署一行命令", todo("如 wrangler deploy / docker compose up -d / vercel --prod；详见 DEPLOYMENT.md"), "DEPLOYMENT.md"],
+                    ["回滚一行命令", todo("如 wrangler rollback / 重部署上一 tag；详见 RUNBOOK.md"), "RUNBOOK.md"],
+                    ["日志/监控入口", todo("看错误和用量的精确入口路径；详见 MAINTENANCE.md"), "MAINTENANCE.md"],
+                ]),
+                todo("速查卡要求：出事时 30 秒能扫完。每格只放具体值（URL/端口/一行命令/人名），禁止长句和概念描述；细节放对应文档。")),
         section("文档导航",
                 table(["文档", "内容"], nav_rows)),
     ])
@@ -438,7 +463,6 @@ def doc_runbook(level):
     return "\n\n".join([
         frontmatter("RUNBOOK.md", level),
         "# 运维手册 (Runbook)",
-        section("紧急联系人", table(["角色", "联系方式", "负责范围"], [[todo("向用户提问获取"), "", ""]])),
         section("回滚", "```bash\n" + todo("按部署平台写出具体回滚命令：CF Workers 用 wrangler rollback / Dashboard 版本回退；Docker 用上一个 tag 重新部署；写真实命令不写概念") + "\n```"),
         section("常见故障处置",
                 table(["症状", "可能原因", "处置步骤"],
@@ -529,6 +553,10 @@ def main():
     parser.add_argument("--client-level", default="developer", choices=["non-technical", "developer", "devops"])
     parser.add_argument("--mode", default="auto", choices=["auto", "create", "update", "rebuild"],
                         help="auto: existing docs use incremental update; rebuild: replace generated docs")
+    parser.add_argument("--plan", default=None,
+                        help="handoff-plan JSON 路径；默认自动读取 TempScr/project-handoff-plan.json")
+    parser.add_argument("--ignore-plan", action="store_true",
+                        help="忽略 handoff-plan，按默认检测逻辑生成全部文档")
     args = parser.parse_args()
 
     if not REPORT_PATH.exists():
@@ -538,7 +566,7 @@ def main():
     # schema 版本检查
     schema_ver = r.get("schema_version", 0)
     if schema_ver < 3:
-        print(f"[WARN] analysis-report.json 的 schema_version={schema_ver}，当前工具 3.0.0 需要 schema_version>=3。"
+        print(f"[WARN] analysis-report.json 的 schema_version={schema_ver}，当前工具 3.1.1 需要 schema_version>=3。"
               "建议重新运行 analyze_project.py。")
 
     OUT.mkdir(exist_ok=True)
@@ -564,6 +592,14 @@ def main():
         docs["DATABASE.md"] = doc_database(r)
     if r["desktop"]:
         docs["DESKTOP.md"] = doc_desktop(r)
+
+    # 尊重 handoff-plan 的 skip 决策（用户已确认的计划）
+    if not args.ignore_plan:
+        plan = load_plan(Path(args.plan) if args.plan else None)
+        skips = {d["name"] for d in plan.get("documents", []) if d.get("action") == "skip"}
+        for name in sorted(skips & set(docs)):
+            del docs[name]
+            print(f"  {name:22s} 按 handoff-plan 跳过")
 
     generated_names = set(docs) | {"AI-SERVICES.md", "API.md", "DATABASE.md", "DESKTOP.md"}
     existing_generated = {path.name for path in OUT.glob("*.md") if path.name in generated_names}
