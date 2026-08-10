@@ -1,118 +1,59 @@
-# Code Reviewer Ultra — 终极代码评审技能
+# Code Reviewer Ultra
 
-融合 Anthropic / OpenAI Codex / Google Gemini 三家大厂 + OMC 机制的终极代码评审技能。
+面向 Codex / Claude Code / Gemini CLI 的证据化代码评审技能。它支持 PR、commit、branch、工作区变更、静态文件和 agent/skill 工作流评审，输出带文件行号、严重度、置信度、覆盖率和明确 verdict 的结构化报告。
 
-## 设计来源
+## 本次升级
 
-本技能不是从零发明的，而是融合了三家大厂公开的 code-review 技能之长，加上 OMC（oh-my-claudecode）的严谨机制：
+v2.0.0（2026-08-10）将原先的“大清单”重构为：
 
-| 来源 | 仓库 | 融合的强项 |
-|------|------|-----------|
-| **Anthropic 系** | shubhamsaboo/awesome-llm-apps `code-reviewer` | 规则清单 + 安全审计（OWASP Top 10） |
-| **OpenAI Codex** | openai/codex `.codex/skills/code-review*` | Orchestrator 编排 + 变更影响分析 + 状态管理 + 测试覆盖 |
-| **Google Gemini** | google-gemini/gemini-cli `.gemini/skills/code-reviewer` | 7 维度深入分析 + Preparation 准备流程 |
-| **OMC** | oh-my-claudecode `code-reviewer` agent | Severity + Confidence 双评级 + Open Questions + 证据收集 |
+- 先确定评审目标、固定点、意图、spec 和仓库规范；
+- 逐文件建立 reviewed/skipped 覆盖账本；
+- 只对变更提出阻塞性发现，并用完整上下文验证；
+- 将 spec 合规和 standards 合规分成两条轴；
+- 用 `Severity + Confidence` 校准发现，避免把假设当成 P0；
+- 纳入 agent/skill/MCP 的提示注入、工具越权、数据外发和上下文上限检查；
+- 增加 receiving-feedback 的验证、YAGNI 和技术性反驳流程；
+- 将 CodeRabbit、Alibaba OCR delegate、SkillSpector 作为可选且有安全边界的外部工具。
 
-## 三家哲学差异（为什么不能只选一家）
+## 外部来源取舍
 
-| 维度 | Anthropic | OpenAI Codex | Google Gemini |
-|------|-----------|--------------|---------------|
-| **核心提问** | "代码有什么问题？" | "这次变更会破坏什么？" | "每个维度够不够好？" |
-| **组织方式** | 规则清单 | Orchestrator + 子维度 | 7 维度深入 |
-| **强项** | 安全审计 | 变更影响、测试、状态 | 技术细节 |
-| **弱项** | 不关注变更影响、测试 | 传统安全/性能检查少 | 运行时间长 |
-| **Severity** | CRITICAL/HIGH/MEDIUM/LOW | P0/P1/P2/P3 | Critical/Improvements/Nitpicks |
-
-实测发现（在 daxieweb_ptz 项目上）：
-- Anthropic 发现了"缺少认证授权"，其他两家漏了
-- OpenAI Codex 发现了"app.state 闭包捕获"、"测试缺失 P0"、"RTSP URL 泄露"，其他两家漏了
-- Google Gemini 发现了"asyncio.get_event_loop 弃用"，其他两家漏了
-
-**结论：三家互补性极强，合并后能覆盖所有独特发现。**
-
-## 本技能的融合结构
-
-```
-Stage 0: Preparation（准备）        ← Gemini 强项
-Stage 1: Context Understanding     ← Jeffallan 强项
-Stage 2: Seven-Dimension Review    ← 三家合并
-  ├─ 维度1: Security               ← Anthropic 强项
-  ├─ 维度2: Correctness            ← Gemini + Anthropic
-  ├─ 维度3: Performance            ← Anthropic 强项
-  ├─ 维度4: Maintainability        ← Gemini + Jeffallan
-  ├─ 维度5: Readability            ← Gemini
-  ├─ 维度6: Change Impact          ← OpenAI Codex 强项（差异化）
-  │   ├─ 6a: Breaking Changes
-  │   ├─ 6b: Change Size
-  │   └─ 6c: State/Context Mgmt
-  └─ 维度7: Testing                ← OpenAI Codex 强项
-Stage 3: Architecture & Design     ← Jeffallan 强项
-Stage 4: Evidence Collection       ← OMC 强项
-Stage 5: Report Generation         ← 三家合并
-```
-
-## 双评级机制（来自 OMC）
-
-每个发现必须有两个评级：
-
-- **Severity**: P0/P1/P2/P3（CRITICAL/HIGH/MEDIUM/LOW）
-- **Confidence**: HIGH/MEDIUM/LOW
-
-为什么需要 Confidence？因为：
-- 高置信度的 CRITICAL → 直接阻塞
-- 低置信度的 CRITICAL → 放入 Open Questions，不单独阻塞
-- 让下游消费者决定如何过滤
+| 来源 | 采用内容 | 取舍 |
+|---|---|---|
+| [Gemini CLI](https://www.skills.sh/google-gemini/gemini-cli/code-reviewer) | 目标识别、准备阶段、七类核心检查、PR 清理 | 核心流程 |
+| [Jeffallan](https://www.skills.sh/jeffallan/claude-skills/code-reviewer) | 意图 checkpoint、上下文/结构/测试顺序、反馈规范 | 核心流程与 references |
+| [Matt Pocock](https://www.skills.sh/mattpocock/skills/code-review) | 固定比较点、Spec/Standards 双轴、并行评审思想 | 核心模型；按本技能工具能力改为单一编排 |
+| [obra/superpowers](https://www.skills.sh/obra/superpowers/requesting-code-review) | 发起评审时的精确上下文、只读 checkout | receiving/边界 |
+| [obra/superpowers](https://www.skills.sh/obra/superpowers/receiving-code-review) | 先验证再实施、逐项测试、技术性反驳、YAGNI | receiving-feedback.md |
+| [CodeRabbit](https://www.skills.sh/coderabbitai/skills/code-review) | CLI 前置检查、数据外发提醒、agent 输出、复审闭环 | 可选外部引擎 |
+| [Anthropic](https://www.skills.sh/anthropics/knowledge-work-plugins/code-review) | 简洁的安全/性能/正确性维度和 connector-aware 思路 | 核心检查 |
+| [Vercel](https://www.skills.sh/vercel-labs/open-agents/code-review) | 输入模式、读完整文件、真实攻击路径、不过度吹毛求疵 | 核心边界 |
+| [Alibaba OCR](https://www.skills.sh/alibaba/open-code-review/open-code-review) | 规则解析、reviewable file 覆盖率、delegate 模式 | 可选确定性范围工具 |
+| [OpenAI Codex](https://www.skills.sh/openai/codex/code-review) | 编排器、breaking changes、change size、context bounds、integration tests | 核心差异化 |
+| [NVIDIA SkillSpector](https://www.skills.sh/nvidia/skillspector/code-reviewer) | 技能安全扫描的方向性启发 | 条目正文过于泛化，不直接合并；保留为 SkillSpector 静态安全门 |
 
 ## 文件结构
 
-```
+```text
 code-reviewer-ultra/
-├── SKILL.md                         # 主技能文件
-├── README.md                        # 本说明文件
+├── SKILL.md
+├── README.md
+├── agents/openai.yaml
 └── references/
-    ├── security-checklist.md        # 安全审计详细清单（Anthropic）
-    ├── common-issues.md             # 常见问题模式（Jeffallan）
-    ├── change-impact.md             # 变更影响分析（OpenAI Codex）
-    ├── testing-guide.md             # 测试编写指南（OpenAI Codex）
-    ├── feedback-examples.md         # 反馈示例（Jeffallan）
-    └── report-template.md           # 完整报告模板（Jeffallan + OMC）
+    ├── review-checklist.md
+    ├── security-checklist.md
+    ├── change-impact.md
+    ├── testing-guide.md
+    ├── common-issues.md
+    ├── feedback-examples.md
+    ├── report-template.md
+    └── receiving-feedback.md
 ```
 
-## 使用方式
+## 使用边界
 
-### 作为 Claude Code Skill 使用
-
-将本文件夹复制到 `~/.claude/skills/code-reviewer-ultra/`，然后：
-```
-/code-reviewer-ultra
-```
-
-### 作为 subagent 调用
-
-```python
-Agent(
-    subagent_type="general-purpose",
-    prompt="请使用 code-reviewer-ultra 技能评审 [文件路径]..."
-)
-```
-
-### 直接给 LLM 使用
-
-把 SKILL.md + 相关 references 文件作为 system prompt 注入即可。
-
-## 使用场景
-
-- **PR 评审** — 完整 7 维度 + 变更影响
-- **本地变更评审** — git diff 分析
-- **安全审计** — 重点跑维度 1（Security）
-- **代码质量审计** — 重点跑维度 4（Maintainability）
-- **重构评估** — 重点跑维度 6（Change Impact）
-- **Pre-deployment 评审** — 全流程
-
-## 验证
-
-本技能已在 daxieweb_ptz 项目（Python 后端）和 exam-system 项目（Next.js 前端）上验证，能覆盖三家大厂单独评测时的所有独特发现。
+默认只读评审。只有用户明确要求 review-and-fix 时才修改代码；只有用户明确授权时才发送代码到外部审查服务、发表 GitHub 评论、提交或推送。
 
 ## 版本
 
-- v1.0.0 (2026-07-04) — 首版，融合三家大厂 + OMC
+- v2.0.0（2026-08-10）— 结合 11 个候选来源完成流程重构和 agent/skill 安全增强。
+- v1.0.0（2026-07-04）— 首版融合 Gemini、Codex、Anthropic 和 OMC。

@@ -1,129 +1,51 @@
-# Feedback Examples
+# Actionable Feedback Examples
 
-好的反馈示例，来自 Jeffallan code-reviewer。
+Use a finding shape that lets the author reproduce and fix the issue quickly.
 
-## GOOD Feedback（好的反馈）
-
-### 具体、可操作、含代码
+## Security
 
 ```markdown
-### [P0] SQL Injection at `db.ts:42`
-
-**Issue:** Query uses string interpolation.
-```typescript
-const query = `SELECT * FROM users WHERE id = ${userId}`;
+### [P1][HIGH][security] Authorization is checked before, not after, tenant lookup
+- File: `server/orders.ts:42-49`
+- Evidence: `tenantId` comes from the request and the query uses it before verifying ownership.
+- Impact: A user who can guess another tenant ID can read its orders.
+- Fix: Derive the tenant from the authenticated principal and enforce ownership in the query; add a cross-tenant regression test.
 ```
 
-**Impact:** Attackers can execute arbitrary SQL, potential data breach.
-
-**Fix:** Use parameterized query.
-```typescript
-const query = 'SELECT * FROM users WHERE id = $1';
-db.query(query, [userId]);
-```
-```
-
-### 引用具体行号 + 严重程度 + 修复
+## Correctness
 
 ```markdown
-### [P0] Off-by-one at `paginator.ts:42`
-
-**Issue:** `for (let i = 0; i <= items.length; i++)` accesses `items[items.length]` which is undefined.
-
-**Fix:** Change `<=` to `<`.
-```typescript
-for (let i = 0; i < items.length; i++)
-```
+### [P1][HIGH][bug] Retry can create a duplicate job
+- File: `jobs/enqueue.ts:71-84`
+- Condition: The first enqueue succeeds but the acknowledgement times out.
+- Impact: The retry submits the same non-idempotent work twice.
+- Fix: Use an idempotency key or persist the enqueue result before retrying; test timeout-after-success.
 ```
 
-### 表扬好的模式
+## Change impact
 
 ```markdown
-## Positive Observations
-- Clean separation of concerns in service layer
-- Comprehensive input validation on DTOs
-- Good test coverage for edge cases
-- Excellent error messages with context
-- Proper use of parameterized queries
+### [P1][HIGH][scope] Config rename breaks existing deployments
+- File: `config/load.ts:18`
+- Evidence: `VIDEO_URL` was removed and no compatibility alias or migration exists; callers and deployment manifests still use it.
+- Impact: Existing processes fail at startup after upgrade.
+- Fix: Read both keys with a deprecation warning, update manifests, and add an old-config startup test.
 ```
 
-## BAD Feedback（差的反馈）
-
-### 模糊、无行号、无修复
+## Tests
 
 ```markdown
-// BAD
-"The code has some issues. Consider improving the error handling and maybe adding some comments."
+### [P1][MEDIUM][test] New failure path has no regression coverage
+- File: `client/stream.ts:93-108`
+- Evidence: A timeout now returns a fallback result, but no test asserts the timeout, cleanup, or caller-visible status.
+- Impact: A future refactor can silently turn the fallback into a false success.
+- Fix: Add an integration test with a timed-out upstream and assert cleanup plus the returned status.
 ```
 
-问题：无 file:line、无 severity、无具体 fix。
+## Useful calibration
 
-### 过度严重
-
-```markdown
-// BAD
-"Missing JSDoc comment - CRITICAL"
-```
-
-问题：missing JSDoc 是 LOW，不是 CRITICAL。Severity 通胀。
-
-### 风格吹毛求疵
-
-```markdown
-// BAD
-"Use single quotes instead of double quotes."
-```
-
-问题：当 prettier 已配置时，不要在引号风格上阻塞。
-
-## 反馈语气
-
-### GOOD（建设性）
-> "This function retrieves user data but has a SQL injection risk at line 42. Consider using parameterized queries to prevent attackers from executing arbitrary SQL."
-
-### BAD（攻击性）
-> "This is completely wrong. Who writes SQL like this? Did you even test this?"
-
-## 处理分歧
-
-### 作者有注释解释时
-
-```markdown
-// GOOD
-"I see you've noted that the synchronous call is intentional for consistency with the legacy module. 
-That reasoning makes sense for now. For future work, consider migrating to async to avoid blocking 
-the event loop — happy to help with that migration."
-```
-
-### 不要在偏好上阻塞
-
-```markdown
-// GOOD
-"Minor: I'd prefer `userId` over `uid` for clarity, but this is a personal preference — not blocking."
-```
-
-## Verdict 解释
-
-### APPROVE
-```markdown
-**Verdict: APPROVE**
-Code is well-structured, security is solid (parameterized queries, input validation), 
-and tests cover edge cases. Minor suggestions only — not blocking.
-```
-
-### REQUEST CHANGES
-```markdown
-**Verdict: REQUEST CHANGES**
-2 P0 issues must be fixed before merge:
-1. SQL injection at db.ts:42
-2. Missing auth on /api/admin endpoint
-
-Please address these and re-request review.
-```
-
-### COMMENT
-```markdown
-**Verdict: COMMENT**
-No blocking issues. A few open questions about the intended behavior of the retry logic 
-that I'd like to clarify before approving.
-```
+- State the triggering input or environment, not only the abstract risk.
+- Cite the smallest line range that proves the issue.
+- Distinguish a confirmed bug from a question about an unverified runtime path.
+- Do not call formatting, naming, or a subjective refactor “critical”.
+- Mention a good pattern only when it explains why the implementation is safe or worth preserving; avoid empty praise.
