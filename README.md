@@ -7,6 +7,7 @@
 | Skill | 用途 | 大小 |
 |-------|------|------|
 | `code-reviewer-ultra` | 证据化代码评审 v2.0.0（Spec/Standards、安全、变更影响、测试与 Agent 安全） | ~30 KB |
+| `code-simplifier-ultra` | 证据驱动代码简化与行为保持重构 v2.1.0 | ~40 KB |
 | `project-handoff` | 项目交接文档生成（三段式流水线，新版） | ~30 KB |
 | `online-fonts-icons` | CDN 中文字体（46款）与图标库（5套）集成指南 | ~20 KB |
 | `amap-jsapi-skill` | 高德地图 JS API v2.0 开发集成指南 | ~92 KB |
@@ -23,6 +24,7 @@
 
 ```bash
 npx skills add https://github.com/Myparjna/myparjna-skills --skill code-reviewer-ultra --yes
+npx skills add https://github.com/Myparjna/myparjna-skills --skill code-simplifier-ultra --yes
 npx skills add https://github.com/Myparjna/myparjna-skills --skill project-handoff --yes
 npx skills add https://github.com/Myparjna/myparjna-skills --skill online-fonts-icons --yes
 npx skills add https://github.com/Myparjna/myparjna-skills --skill harmony-os-ux-guide --yes
@@ -33,6 +35,10 @@ npx skills add https://github.com/Myparjna/myparjna-skills --skill harmony-os-ux
 ```bash
 npx skills add https://github.com/Myparjna/myparjna-skills --list
 ```
+
+## code-simplifier-ultra v2.1.0
+
+证据驱动的代码简化与行为保持重构技能：冻结工作范围，发现项目规则与运维护栏，建立行为证据，应用最小可辩护改动，并按风险表面完成审查与验证。
 
 ## code-reviewer-ultra v2.0.0 设计来源
 
