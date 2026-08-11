@@ -566,7 +566,7 @@ def main():
     # schema 版本检查
     schema_ver = r.get("schema_version", 0)
     if schema_ver < 3:
-        print(f"[WARN] analysis-report.json 的 schema_version={schema_ver}，当前工具 3.1.1 需要 schema_version>=3。"
+        print(f"[WARN] analysis-report.json 的 schema_version={schema_ver}，当前工具 3.1.2 需要 schema_version>=3。"
               "建议重新运行 analyze_project.py。")
 
     OUT.mkdir(exist_ok=True)
@@ -593,7 +593,7 @@ def main():
     if r["desktop"]:
         docs["DESKTOP.md"] = doc_desktop(r)
 
-    # 尊重 handoff-plan 的 skip 决策（用户已确认的计划）
+    # 尊重 handoff-plan 的 skip 决策（计划默认由扫描事实生成，也可手动定制）
     if not args.ignore_plan:
         plan = load_plan(Path(args.plan) if args.plan else None)
         skips = {d["name"] for d in plan.get("documents", []) if d.get("action") == "skip"}

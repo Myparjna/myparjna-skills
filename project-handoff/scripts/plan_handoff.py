@@ -2,8 +2,9 @@
 """生成交接文档计划（handoff-plan）：模式判定 + 文档生成/跳过清单 + 每份 focus + 扫描范围。
 
 在 analyze_project.py 之后、generate_handoff.py 之前运行。
-计划写入 TempScr/project-handoff-plan.{json,md}，AI 必须先向用户展示并确认；
-用户可直接编辑 plan 文件调整 action/focus，generate_handoff.py 会读取并尊重 skip 决策。
+计划写入 TempScr/project-handoff-plan.{json,md}，默认根据扫描事实自动采用；
+如确需定制，用户可在运行 generate_handoff.py 前编辑 plan 文件调整 action/focus。
+generate_handoff.py 会读取并尊重 skip 决策。
 """
 
 from __future__ import annotations
@@ -157,7 +158,8 @@ def build_plan(report: dict, intent: str, client_level: str) -> dict:
             "notes": scope_notes,
         },
         "ai_instructions": [
-            "先把本计划展示给用户确认（模式、文档清单、focus、范围），用户可编辑 plan 文件调整后再继续。",
+            "本计划根据扫描事实自动采用；AI 快速检查模式、文档清单和扫描范围后直接继续，不等待用户确认。",
+            "如确需定制，用户可在运行 generate_handoff.py 前编辑 plan 文件中的 action/focus。",
             "generate_handoff.py 会读取本计划并跳过 action=skip 的文档。",
             "required=true 的文档是门禁硬要求，跳过会导致 verify 失败。",
             "update 模式下本计划只判定模式与缺失文档；具体章节影响仍以 compare_handoff.py 的更新建议为准。",
@@ -195,15 +197,15 @@ def render_markdown(plan: dict) -> str:
     lines.extend(f"- {item}" for item in plan["ai_instructions"])
     lines.extend([
         "",
-        "> 请用户确认或修改本计划（可直接编辑 project-handoff-plan.json 中的 action/focus），",
-        "> 确认后再运行 generate_handoff.py。",
+        "> 本计划默认直接进入生成流程；如需手工裁剪文档或调整 focus，请在运行 generate_handoff.py 前编辑",
+        "> `project-handoff-plan.json` 中的 action/focus。",
         "",
     ])
     return "\n".join(lines)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate handoff plan for user review")
+    parser = argparse.ArgumentParser(description="Generate handoff plan for automatic execution")
     parser.add_argument("--intent", default="auto", choices=["auto", "create", "update", "rebuild"],
                         help="用户已明确的模式意向；auto 按现有文档自动判定")
     parser.add_argument("--client-level", default="developer",
@@ -225,7 +227,7 @@ def main() -> None:
     print(f"Handoff plan written to {md_path}")
     print(f"- 模式: {plan['mode']}（{plan['mode_reason']}）")
     print(f"- 文档: 生成 {generate_count} 份，跳过 {skip_count} 份")
-    print("下一步: 向用户展示计划并等待确认；确认后运行 generate_handoff.py。")
+    print("下一步: 直接运行 generate_handoff.py；计划默认自动采用（如需定制，可先编辑 plan 文件）。")
 
 
 if __name__ == "__main__":

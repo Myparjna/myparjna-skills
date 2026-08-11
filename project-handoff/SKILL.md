@@ -5,7 +5,7 @@ description: "Create, inspect, incrementally update, compare, or explicitly rebu
 
 # Project Handoff
 
-> 工具版本 3.1.1（schema 3）。为项目创建或增量更新完整的 `ProjectDoc/`。流程由“项目定位 + 事实扫描 + 计划确认 + 新旧比对（含 git 变更） + AI 语义更新 + 脚本验收”构成。
+> 工具版本 3.1.2（schema 3）。为项目创建或增量更新完整的 `ProjectDoc/`。流程由“项目定位 + 事实扫描 + 自动计划 + 新旧比对（含 git 变更） + AI 语义更新 + 脚本验收”构成。
 
 模式语义必须严格区分：`更新交接文档`/`更新文档` 默认是**增量更新**，先给出比对建议，再原地修改受影响章节；只有用户明确说 `重建交接文档`、`重新生成交接文档` 或同意完全重置时，才能使用 `--mode rebuild`。没有旧文档时使用首次创建模式。
 
@@ -74,15 +74,15 @@ python /absolute/path/to/project-handoff/scripts/analyze_project.py
 
 更新时，扫描器以最近一次验收通过的 `ProjectDoc/.handoff/analysis-report.verified.json` 为稳定基线，生成 `analysis-report.previous.json` 后再写入新报告；重复扫描不会推进基线。报告同时记录关键文件 SHA-256 和当前 git commit hash，供增量比对。
 
-### Step 3 — 生成交接计划并交用户确认
+### Step 3 — 生成交接计划并自动采用
 
 ```bash
 python /absolute/path/to/project-handoff/scripts/plan_handoff.py
 ```
 
-产出 `TempScr/project-handoff-plan.md` 与 `.json`：判定模式（create/update/rebuild）、列出哪些文档生成/跳过（条件文档未检测到相关事实时自动跳过）、每份文档的 focus、扫描范围完整性。用户已明确意向时传 `--intent create|update|rebuild`。
+产出 `TempScr/project-handoff-plan.md` 与 `.json`：判定模式（create/update/rebuild）、列出哪些文档生成/跳过（条件文档未检测到相关事实时自动跳过）、每份文档的 focus、扫描范围完整性。计划根据扫描事实自动采用；用户已明确意向时传 `--intent create|update|rebuild`。
 
-必须向用户展示计划摘要并等待确认后再继续；用户可直接编辑 plan 文件中的 action/focus。小项目可跳过非必需文档（`required` 为 true 的文档不得跳过，否则 verify 会失败）；大项目的特殊主题（合规、多租户等）记入对应文档的 focus，在 Step 7 写入相关章节。后续 `generate_handoff.py` 会自动读取该计划并尊重 skip 决策。
+AI 应快速检查计划摘要中的模式、文档清单和扫描范围，然后直接继续，不再把“形成哪些文档”的确认作为人工门禁。确实需要定制时，可在运行 `generate_handoff.py` 前编辑 plan 文件中的 action/focus；小项目可跳过非必需文档（`required` 为 true 的文档不得跳过，否则 verify 会失败）；大项目的特殊主题（合规、多租户等）记入对应文档的 focus，在 Step 7 写入相关章节。后续 `generate_handoff.py` 会自动读取该计划并尊重 skip 决策。
 
 ### Step 4 — 生成并审阅更新建议
 
@@ -179,7 +179,7 @@ max_files: 5000                       # 最大扫描文件数
 
 - `scripts/discover_project.py` — 发现候选项目根目录和历史交接文档，供 AI 决策
 - `scripts/analyze_project.py` — 扫描，输出 analysis-report.json
-- `scripts/plan_handoff.py` — 生成交接计划（模式判定 + 文档清单 + focus + 范围），交用户确认
+- `scripts/plan_handoff.py` — 生成交接计划（模式判定 + 文档清单 + focus + 范围），默认自动采用；需要定制时可手动编辑计划
 - `scripts/compare_handoff.py` — 比较新旧扫描报告并生成增量更新建议（含基线以来的 git 变更）
 - `scripts/generate_handoff.py` — 按 create/update/rebuild 模式生成或补齐骨架
 - `scripts/verify_handoff.py` — 质量门禁

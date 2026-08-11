@@ -15,7 +15,7 @@ from _handoff_common import force_utf8_console
 
 ROOT = Path.cwd()
 OUT_DIR = ROOT / "ProjectDoc"
-TOOL_VERSION = "3.1.1"
+TOOL_VERSION = "3.1.2"
 SCHEMA_VERSION = 3
 
 # --- 配置（可被 .handoff.yml 覆盖） ---
