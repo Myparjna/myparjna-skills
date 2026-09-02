@@ -1,6 +1,6 @@
 ---
 name: online-fonts-icons
-description: This skill should be used when the user needs to integrate online Chinese fonts or icon libraries into web projects via CDN. It provides ready-to-use CDN URLs, font-family declarations, and HTML/CSS code snippets for 34 curated Chinese fonts (6 categories) and 5 icon libraries. All font-family names are verified against actual CSS declarations via real browser CDP testing. Includes font usage principles (decorative fonts ONLY for headlines/titles, NOT for body text) and icon color selection logic (white icons on colored backgrounds, deep theme-colored icons on light backgrounds). Trigger when: user mentions fonts, Chinese web fonts, icon libraries, CDN fonts, Google Fonts alternatives for Chinese, typography guidance for web pages/dashboards/presentations, or needs to choose icon colors that match background colors.
+description: "用户提到 中文字体、网页字体、在线字体、图标库、CDN 字体、图标颜色 时必须使用本技能。提供 35 款中文字体与 5 套图标库的 CDN 引入代码、字体声明与配色建议。"
 ---
 
 # Online Fonts & Icons Skill
@@ -80,7 +80,7 @@ Top picks: `LXGW WenKai GB Screen`（霞鹜文楷, 可做正文）, `STDongGuanT
 
 → Full code: `references/03-song-kai-calligraphy.md`
 
-### ④ Round/Cute/Handwrite (圆体可爱手写, 12 fonts) — CUTE/UI/KIDS APPS
+### ④ Round/Cute/Handwrite (圆体可爱手写, 13 fonts) — CUTE/UI/KIDS APPS
 Top picks: `寒蝉半圆体`（通用UI首选）, `JiangChengYuanTi`（江城圆体，不出错通用型）, `975Maru SC Medium`（日系）
 
 → Full code: `references/04-round-cute-handwrite.md`

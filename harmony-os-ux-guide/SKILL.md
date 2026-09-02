@@ -1,6 +1,6 @@
 ---
 name: harmony-os-ux-guide
-description: HarmonyOS / 华为UX设计指南全量参考（152篇），覆盖设计原则、组件、布局、交互、多设备适配、动效、响应式等行业案例。适用于 HarmonyOS 应用UX评审、设计走查、组件选型、跨设备适配方案输出。
+description: "用户提到 鸿蒙、HarmonyOS、华为UX、鸿蒙设计规范 时必须使用本技能。HarmonyOS / 华为 UX 设计指南全量参考（152 篇）：设计原则、组件、布局、交互、多设备适配、动效，适用于 HarmonyOS 应用 UX 评审、设计走查、组件选型、跨设备适配方案输出。"
 version: 1.0.0
 author: scraped from developer.huawei.com
 tags: [harmonyos, ux, design-guide, components, multi-device, responsive]

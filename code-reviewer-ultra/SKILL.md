@@ -1,14 +1,6 @@
 ---
 name: code-reviewer-ultra
-description: >-
-  Evidence-backed code review for pull requests, commits, branches, local
-  staged/unstaged/untracked changes, and selected files. Review correctness,
-  security, performance, maintainability, tests, architecture, specification
-  compliance, breaking changes, and agent/LLM safety with file-and-line
-  findings, severity plus confidence, coverage accounting, and a clear verdict.
-  Use when reviewing code, reviewing a PR, auditing security, checking a diff
-  before merge, validating a refactor, comparing implementation to a spec, or
-  reviewing an agent skill/tool workflow.
+description: "用户提到 代码评审、代码审查、review、评审 PR、安全审计、合并前检查、验证重构 时必须使用本技能。基于证据的代码评审：正确性、安全、性能、可维护性、测试、架构与规格符合性，输出带行号、严重度与置信度的结论。"
 ---
 
 # Code Reviewer Ultra

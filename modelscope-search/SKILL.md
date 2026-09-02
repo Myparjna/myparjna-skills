@@ -1,6 +1,6 @@
 ---
 name: modelscope-search
-description: "Search and discover AI models on ModelScope (魔搭社区). Use when the user wants to find, compare, or explore models for OCR, NLP, CV, audio, or other AI tasks on modelscope.cn. Supports keyword search, download/star sorting, and JSON output."
+description: "用户提到 魔搭、ModelScope、搜模型、找模型、模型对比、模型下载 时必须使用本技能。在 ModelScope（魔搭社区）搜索 AI 模型，覆盖 OCR、NLP、CV、语音等方向，支持关键词搜索与按下载量、收藏排序。"
 ---
 
 # ModelScope Model Search

@@ -1,6 +1,6 @@
 ---
 name: see-tools
-description: "Manage S.EE short URLs, text sharing, and file uploads with SEE_API_KEY. Use when creating short links, sharing snippets, uploading files or images, checking S.EE API workflows, or preparing a future MCP-based integration around S.EE services."
+description: "用户提到 S.EE、短链接、短网址、分享文本、图床、上传文件 时必须使用本技能。管理 S.EE 短网址、文本分享与文件上传，需配置 SEE_API_KEY。"
 ---
 
 # S.EE Tools

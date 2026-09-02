@@ -1,7 +1,7 @@
 ---
 name: code-simplifier-ultra
 argument-hint: "[paths|range] [--simplify] [--review] [--no-report] [--no-verify]"
-description: Evidence-driven code simplification and behavior-preserving refactoring for recent changes, explicit file scopes, review targets, or post-implementation polish requested by the user or an active workflow. Use when asked to simplify, clean up, refactor, polish, reduce complexity, improve readability, remove dead code or duplication, or review a PR for maintainability. Covers project-context discovery, guardrail identification, minimal diffs, surface-based review profiles, language-aware idioms, and verification evidence across JavaScript, TypeScript, Python, FastAPI, Rust, Go, shell, and general code.
+description: "用户提到 简化代码、清理代码、重构、优化可读性、删除死代码、消除重复 时必须使用本技能。证据驱动的行为保持重构：最小改动、按风险面审查、附验证证据。"
 ---
 
 # Code Simplifier Ultra
