@@ -1,43 +1,21 @@
 ---
 name: project-handoff
-description: "Create, inspect, incrementally update, compare, or explicitly rebuild complete project handoff documentation: usage guides, architecture and module maps, regression testing, deployment, environment variables, AI APIs, databases, native/embedded builds, local inference, known issues, and runbooks. Use for project delivery, team or AI-agent transitions, maintainer onboarding, or when the user says: 交接文档, 更新交接文档, 比对交接文档, 重建交接文档, 更新文档, 查看交接文档."
+description: "用户提到 交接文档、更新交接文档、重建交接文档、比对交接文档、查看交接文档、更新文档、项目交付、交接给同事或 AI 时必须使用本技能；想把项目整理成一套完整文档时也使用。创建、增量更新、比对或重建项目交接文档。默认增量更新，仅当用户明确说“重建/重新生成”才全量重置。"
 ---
 
 # Project Handoff
-
-> 工具版本 3.1.2（schema 3）。为项目创建或增量更新完整的 `ProjectDoc/`。流程由“项目定位 + 事实扫描 + 自动计划 + 新旧比对（含 git 变更） + AI 语义更新 + 脚本验收”构成。
 
 模式语义必须严格区分：`更新交接文档`/`更新文档` 默认是**增量更新**，先给出比对建议，再原地修改受影响章节；只有用户明确说 `重建交接文档`、`重新生成交接文档` 或同意完全重置时，才能使用 `--mode rebuild`。没有旧文档时使用首次创建模式。
 
 ## 硬性规则（MUST）
 
-1. **禁止跳步。** 必须按 Step 0 → 8 顺序执行。
-2. **禁止编造。** 所有内容必须来自：扫描报告 `analysis-report.json`、你实际读过的源码文件、或用户的明确回答。不确定的内容写 `[需向交接人确认: 具体问题]`，不许猜。
-3. **禁止留空。** 每个 `TODO(AI)` 必须被处理：要么填入真实内容，要么改写为 `[需向交接人确认: ...]`。
-4. **`verify_handoff.py` 不通过，禁止交付。** 这是质量门禁，没有例外。
-5. 填写前必须先读技能目录下的 `fill-guide.md`，按其中的逐文件标准执行。
-6. **增量更新禁止重写未受影响文档。** 旧文档中的人工决策、业务约定和运维经验默认保留。
-7. **禁止把“检测到测试”写成“测试通过”。** 只有实际执行并观察结果的测试才能记为通过。
-
-## 运行位置说明
-
-这个 skill 可能是项目内置的，也可能安装在 Claude Code / Codex / Cursor 的全局 skills 目录。**所有脚本都要在目标项目根目录执行**，这样输出才会写入目标项目的 `ProjectDoc/`。
-
-- 如果 skill 已复制到目标项目根目录，可直接运行 `python scripts/<script>.py`。
-- 如果 skill 是全局安装的，先确认本 skill 的实际目录（即包含本 `SKILL.md` 的目录），再在目标项目根目录运行：
-
-```bash
-python /absolute/path/to/project-handoff/scripts/analyze_project.py
-python /absolute/path/to/project-handoff/scripts/compare_handoff.py
-python /absolute/path/to/project-handoff/scripts/generate_handoff.py --mode update --client-level developer
-python /absolute/path/to/project-handoff/scripts/verify_handoff.py
-```
-
-Windows PowerShell 示例：
-
-```powershell
-python "C:\absolute\path\to\project-handoff\scripts\analyze_project.py"
-```
+1. **必须按 Step 0 → 8 顺序执行，不得跳步。**
+2. 所有内容必须来自：扫描报告 `analysis-report.json`、你实际读过的源码文件、或用户的明确回答。不确定的内容写 `[需向交接人确认: 具体问题]`。
+3. 每个 `TODO(AI)` 必须被处理：要么填入真实内容，要么改写为 `[需向交接人确认: ...]`。
+4. `verify_handoff.py` 是质量门禁，有 FAIL 项时回到 Step 7 修复后再交付。
+5. 填写前先读技能目录下的 `fill-guide.md`，按其中的逐文件标准执行。
+6. 增量更新只改受影响文档；旧文档中的人工决策、业务约定和运维经验默认保留。
+7. 区分“检测到测试”“实际执行过”“执行通过”，只有实际执行并观察结果的测试才能记为通过。
 
 ## Workflow
 
