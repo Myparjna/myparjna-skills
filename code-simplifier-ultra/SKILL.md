@@ -11,13 +11,13 @@ Simplify code only when the change has a concrete readability, maintainability, 
 ## Arguments
 
 - Paths, patterns, a commit/PR range, or a scope phrase: resolved once in Workflow §1, then frozen.
-- `--simplify`: simplify only; skip the review pass.
-- `--review`: inspect and fix only; skip simplification.
-- Neither or both: simplify first, then review the simplified result.
+- `--simplify`: simplify without the separate review pass; still perform the minimum diff and behavior-parity self-check in §6.
+- `--review`: read-only inspection of the frozen scope; skip simplification and all edits, and report findings only.
+- Neither or both: simplify first, then check and correct only regressions introduced by this simplification.
 - `--no-report`: return terse working notes instead of the full report (for orchestrator callers).
-- `--no-verify`: skip verification because a parent workflow verifies the final result separately.
+- `--no-verify`: defer executable checks to the parent workflow; never skip the minimum diff and behavior-parity self-check, and disclose deferred checks.
 
-Do not silently expand a simplify request into architecture redesign, feature work, dependency upgrades, or a repository-wide rewrite. Deep multi-pass review belongs to a dedicated review skill (for example code-reviewer-ultra); this skill fixes only defensible findings.
+Do not silently expand a simplify request into architecture redesign, feature work, dependency upgrades, or a repository-wide rewrite. Only make behavior-preserving simplifications and correct regressions they introduce; report pre-existing bugs without fixing them. Broader review is separate work: do not invoke another review skill by default.
 
 ## Workflow
 
@@ -35,7 +35,7 @@ Do not recompute or broaden the scope after editing. Read [scope-and-context.md]
 
 ### 2. Discover project rules and guardrails before judging code
 
-Read the closest applicable `AGENTS.md`, `CLAUDE.md`, project handoff, `ProjectDoc/`, package manifests, and lint/format/type/test configuration. Inspect neighboring files for established patterns.
+Judge small changes by impact rather than line count. Start with the diff, relevant functions, and necessary callers/tests; evidence that suffices does not require whole-file reading. Read applicable repository instructions and only relevant handoff, manifests, configuration, or neighboring patterns. Expand context for public contracts, security, concurrency, migrations, or unresolved behavior.
 
 Project-local conventions outrank generic advice. Do not impose a framework, function style, naming scheme, error pattern, or formatter preference that the repository does not use.
 
@@ -68,7 +68,7 @@ Avoid line-count optimization, dense one-liners, clever expression chains, one-u
 
 ### 5. Review by surface and risk when review mode is active
 
-Select every applicable surface and read its profile once in [review-profiles.md](references/review-profiles.md):
+After simplification, review only regressions introduced by this task. With `--review` alone, inspect the frozen scope read-only. Select applicable surfaces and read only relevant sections in [review-profiles.md](references/review-profiles.md):
 
 | Surface | Profile |
 | --- | --- |
@@ -82,14 +82,14 @@ For each finding, prove the location, triggering input/state, failure mode, blas
 
 - **CRITICAL**: exploitable security issue, data loss, or critical outage path.
 - **HIGH**: behavior, error-path, boundary, or core performance defect.
-- **MEDIUM**: resource leak, complexity hotspot, test gap, over-scoped change, or speculative complexity likely to cause defects.
-- **LOW**: localized clarity issue with a real maintenance cost.
+- **MEDIUM**: context-dependent behavior or resource regression with concrete impact.
+- **LOW**: minor concrete regression with limited impact.
 
-Merge duplicate findings and apply the smallest fix. Do not report generic preferences as defects. When intent is ambiguous, stop or record the assumption instead of guessing.
+Merge duplicate findings. After simplification, apply the smallest correction only to regressions it introduced; report pre-existing bugs without edits. In `--review`-only mode, report without any fixes. Generic preferences and missing tests alone are not defects. When intent is ambiguous, stop or record the assumption instead of guessing.
 
 ### 6. Verify the final state
 
-After editing:
+After editing, including `--simplify`, always perform at least the diff and behavior-parity self-check. In `--review`-only mode, use read-only checks without edits or automatic fixes. Apply the following in proportion to impact:
 
 1. Inspect the diff for behavior changes, unrelated files, accidental formatting churn, and contract changes.
 2. Run the narrowest applicable formatter/linter, type checker, targeted tests, and invariant checks.
@@ -98,7 +98,7 @@ After editing:
 5. Re-check error paths, side effects, async behavior, resource cleanup, and security boundaries when touched.
 6. Name skipped checks and the reason. Never claim a test passed when it was not run.
 
-Use [verification-and-reporting.md](references/verification-and-reporting.md) for the validation ladder and required handoff format. Use [language-profiles.md](references/language-profiles.md) only for the languages or frameworks actually touched.
+For small, low-impact changes, report changes/findings, actual verification results, and limitations briefly. Use [verification-and-reporting.md](references/verification-and-reporting.md) for the validation ladder; use its full report template only when impact, complexity, or the user requires it. Use [language-profiles.md](references/language-profiles.md) only for the languages or frameworks actually touched.
 
 ## Non-negotiable preservation rules
 

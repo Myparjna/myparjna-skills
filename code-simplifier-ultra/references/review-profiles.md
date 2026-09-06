@@ -1,6 +1,6 @@
 # Review Profiles
 
-Load each selected profile once when review mode is active. Profiles are question sets for the frozen scope, not checklists to recite. Skip a profile when its surface is untouched.
+Load only applicable profile sections when review mode is active. After simplification, use them only to identify and correct regressions introduced by this simplification; report pre-existing bugs without fixing them. With `--review` alone, inspect the frozen scope read-only and do not edit. Profiles are questions, not universal requirements or a reason to invoke another review skill; skip untouched surfaces and do not treat naming preferences as defects.
 
 ## security
 

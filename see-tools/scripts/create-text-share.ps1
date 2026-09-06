@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 param(
     [Parameter(Mandatory = $true)][string]$Title,
     [Parameter(Mandatory = $true)][string]$Content,
@@ -16,6 +17,8 @@ $body = @{
 
 Invoke-RestMethod `
     -Method Post `
+    -TimeoutSec 60 `
+    -ErrorAction Stop `
     -Uri "https://s.ee/api/v1/text" `
     -Headers @{ Authorization = $env:SEE_API_KEY } `
     -ContentType "application/json" `

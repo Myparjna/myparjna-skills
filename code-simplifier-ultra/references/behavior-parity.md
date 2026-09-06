@@ -32,3 +32,4 @@ When changing error handling, test success, expected failure, malformed input, b
 - Removing a fallback, log, metric, feature flag, or compatibility branch because it looks redundant can break operations.
 - Extracting a helper can change `this`, closure capture, evaluation order, identity, or error location.
 - “Equivalent” regex, query, serialization, numeric, timezone, and Unicode changes are not assumed equivalent.
+

@@ -1,0 +1,7 @@
+interface:
+  display_name: "S.EE Tools"
+  short_description: "Short links, text sharing, and file upload workflows."
+  default_prompt: "Use $see-tools to create a short URL, text share, or file upload via the S.EE API."
+
+policy:
+  allow_implicit_invocation: true

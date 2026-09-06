@@ -5,7 +5,11 @@ description: "用户提到 中文字体、网页字体、在线字体、图标�
 
 # Online Fonts & Icons Skill
 
-CDN-based Chinese font and icon library integration guide. All resources verified, free-to-use (mostly OFL-1.1), loadable via CDN without local files.
+CDN-based Chinese font and icon library integration guide. Availability is URL-, time- and network-specific; a successful HTTP response is not proof of a usable font. License terms must be checked per font and version; this guide does not certify all fonts as free for commercial use.
+
+核验依据（2026-09-06 全量复核）：只读用户 `C:/Users/mypra/Desktop/VibeCoding指南/免费资源合集/免费字体预览/app.js` 中的全部 45 款字体配置（family、cdn、cdnType），逐款核验 CSS 与字体文件。**45/45 全部可用**：CSS 返回 200，字体文件返回 200 且魔数校验通过（woff2/wOFF 等）。核验明细见 `TempFiles/0906-字体全量核验/results.json`。
+
+**ZeoSeven（fontsapi.zeoseven.com）反爬提醒**：用脚本裸请求（无浏览器 User-Agent）会得到 HTTP 204 空响应，这不代表字体失效。判活必须带浏览器请求头（User-Agent + Accept），或直接在浏览器/页面中验证；不得凭脚本 204 断定字体停用。
 
 ## When to Use
 
@@ -30,9 +34,9 @@ CDN-based Chinese font and icon library integration guide. All resources verifie
 
 ### Icon Color Selection Logic (MUST follow this)
 
-**Core rule**: Icon color depends entirely on background lightness.
+**Core rule**: Choose icon colors using measured contrast against adjacent colors, plus semantics and interaction states. Background lightness alone is insufficient; colored backgrounds do not automatically require white icons.
 
-**Case A — Colored/Dark Background → White Icon**
+**Case A — Dark Background → White Icon, only if measured contrast passes**
 ```html
 <img src="icon.svg" style="filter:brightness(0) invert(1);">
 ```
@@ -48,7 +52,7 @@ filter:brightness(0)saturate(100%)invert(70%)sepia(95%)saturate(600%)hue-rotate(
 Use on: quick-action cards, stat cards, list items, light toolbars, empty states.
 
 **Design rules:**
-1. Contrast first: WCAG AA ≥ 4.5:1 ratio required
+1. Contrast first: WCAG AA requires essential non-text icons/controls ≥ 3:1 against adjacent colors; normal text ≥ 4.5:1; large text ≥ 3:1 (18pt or 14pt bold). Decorative icons/inactive controls are exceptions. Measure final colors including alpha/filter/gradient; see `references/07-icon-libraries.md`.
 2. Color semantics: red=error, green=success, yellow=warning, blue=info
 3. Max 3 icon colors per page — don't over-color
 4. Neutral areas use gray icons — data-dense zones shouldn't compete for attention
@@ -110,7 +114,9 @@ Also: `x12y16pxMaruMonica`（莫妮卡像素圆体）
 
 ## CDN Platforms
 
-| Platform | URL Pattern | Fonts | Status |
+以下平台数量和状态为旧版记录，未在本次全量复核；具体地址以本页带日期的抽样及目标环境测试为准，“稳定”不构成持续可用保证。
+
+| Platform | URL Pattern | Fonts | Historical status |
 |----------|-------------|-------|--------|
 | jsDelivr | `cdn.jsdelivr.net/npm/...` | ~5 | ✅ Stable |
 | ZeoSeven | `fontsapi.zeoseven.com/{id}/main/result.css` | 31 | ✅ Stable (Recommended) |
@@ -121,7 +127,7 @@ Also: `x12y16pxMaruMonica`（莫妮卡像素圆体）
 
 ## ⚠️ IMPORTANT: Deprecated Fonts
 
-The following fonts have **NO working CDN** and are excluded from this skill:
+以下为旧版未收录或曾未找到 CDN 的历史记录，不代表现时没有可用源。遇到用户近期实测 URL，应优先核对，不直接否定或删除该字体：
 - 快看世界体 (kksjt) — No CDN found
 - 思源屏显臻宋 — No CDN found
 - 鲨鱼菲特健康体 — No CDN found
@@ -156,7 +162,7 @@ The following fonts have **NO working CDN** and are excluded from this skill:
 | 站酷文艺体 | `站酷文艺体` | `zcoolwenyiti` |
 | 点点像素体-方形 | `点点像素 方` | `点点像素体-方形` |
 
-**验证方法**：浏览器 DevTools → Network → 加载 CSS → 查看 `@font-face { font-family: "..." }`，或用 `document.fonts.load('20px "family名"')` 检查是否真能加载到 FontFace。**family 名写错时，CSS 即使 200 也会静默回退到系统字体，肉眼看不出但字体没生效。**
+**验证方法**：浏览器 DevTools → Network → 加载 CSS → 查看 `@font-face { font-family: "..." }`，或用 `document.fonts.load('20px "family名"', '实际目标文字')` 检查返回的 FontFace 数组非空且各项 status 为 loaded，再在 DevTools 的 Rendered Fonts 检查实际文字使用的字体。仅 Promise 成功或 `document.fonts.check()` 为 true 不足以证明目标字体已生效。**family 名写错时，CSS 即使 200 也会静默回退到系统字体，肉眼看不出但字体没生效。**
 
 ## Workflow
 
@@ -170,9 +176,9 @@ The following fonts have **NO working CDN** and are excluded from this skill:
 
 ## Important Notes
 
-- Free commercial use (OFL-1.1), verify before production
+- 商用前逐款核对作者/发行方的具体授权与字体版本；CDN 可下载、项目名含“免费”、或其他字体采用 OFL 均不构成本字体授权证明。
 - Chinese fonts are 2MB+ woff2; CDN uses subsetting optimization
 - Always set English fallback: `sans-serif`, `serif`, `monospace`
 - ZeoSeven URLs must include `/main/result.css` suffix
 - Tabler Icons is recommended as default icon choice (zero dependency)
-- Avoid fonts marked as DEPRECATED — they have no working CDN
+- DEPRECATED 是历史源状态标记，不等于字体本身不可用；有近期实测源时按具体 URL 重新核验。

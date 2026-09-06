@@ -2,7 +2,7 @@
 
 ## Validation ladder
 
-Run only checks relevant to the frozen scope, from narrow to broad:
+Run only checks relevant to the frozen scope, from narrow to broad. `--simplify` still requires the minimum diff and behavior-parity self-check; `--no-verify` defers executable checks only. `--review` alone permits read-only checks, not formatting writes or automatic fixes:
 
 1. Parse/compile the touched files.
 2. Run the formatter or linter in check mode; apply formatting only when it is part of project practice.
@@ -26,7 +26,7 @@ Name each guard in the report as a command with its result. A guard that was not
 
 ## Required report
 
-Use this compact structure:
+For small, low-impact changes, use a short report with changes/findings, actual verification results, and limitations; distinguish corrected new regressions from pre-existing bugs reported without edits. Keep these essentials with `--no-report` as well. Use the full structure below only when impact, complexity, or the user requires it:
 
 ```text
 ### Code Simplifier Ultra — complete|blocked

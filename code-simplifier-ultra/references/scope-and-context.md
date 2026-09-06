@@ -4,7 +4,7 @@ Use this reference when scope, repository rules, or generated boundaries are unc
 
 ## Repository evidence
 
-Inspect only what is relevant, but check for these sources in order of proximity:
+Judge small changes by impact, not line count. Start with the diff, relevant functions, and necessary callers/tests; stop expanding when evidence suffices rather than reading whole files. Expand for public contracts, security, concurrency, migrations, or unresolved behavior. Inspect only relevant sources below, in order of proximity:
 
 - `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, and project handoff documents;
 - `ProjectDoc/` rules and delivery constraints;

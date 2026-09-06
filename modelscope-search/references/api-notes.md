@@ -61,7 +61,7 @@ This endpoint is **undocumented** — discovered by reading the ModelScope Pytho
 
 ## Known Limitations
 
-1. **No server-side sorting** — must sort locally after fetching
+1. **Local sorting** — only the fetched page is sorted, not the full matching collection. This script does not request server-side sorting.
 2. **Fuzzy search only** — no exact match, no boolean operators
 3. **Name vs Path conflict** — cannot combine keyword search with org filter
 4. **Pagination** — `TotalCount` reflects filtered count, but large offsets may be slow
@@ -75,3 +75,7 @@ The official Python SDK (`pip install modelscope`) provides:
 - `modelscope download --model 'org/name'` — CLI download
 
 This skill fills the gap: **keyword search** which the SDK does not expose.
+
+## Exact detail lookup
+
+`GET https://www.modelscope.cn/api/v1/models/{org}/{name}` returns `Data` directly. No organization-page scan. Verified against official source: https://github.com/modelscope/modelscope/blob/v1.37.1/modelscope/hub/api.py (`HubApi.get_model`, revision=None). Search and detail are direct HTTP requests, with no SDK import or CLI invocation.

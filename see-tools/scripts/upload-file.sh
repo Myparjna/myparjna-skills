@@ -13,7 +13,11 @@ if [[ ! -f "${FILE_PATH}" ]]; then
   exit 1
 fi
 
-curl -sS \
+# Quote the filename for curl's multipart parser, not just for the shell.
+FORM_PATH="${FILE_PATH//\\/\\\\}"
+FORM_PATH="${FORM_PATH//\"/\\\"}"
+
+curl --fail-with-body -sS --connect-timeout 10 --max-time 300 \
   -X POST "https://s.ee/api/v1/file/upload" \
   -H "Authorization: ${SEE_API_KEY}" \
-  -F "file=@${FILE_PATH}"
+  -F "file=@\"${FORM_PATH}\""

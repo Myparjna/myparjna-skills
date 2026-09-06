@@ -1,6 +1,6 @@
 ---
 name: harmony-os-ux-guide
-description: "用户提到 UX 设计、用户体验、设计规范、交互设计、界面布局、组件选型、设计走查、设计评审、多设备适配、动效设计 时必须使用本技能。基于华为官方 UX 设计指南整理的 152 篇设计参考：设计原则、组件、布局、交互、多设备适配、动效与行业案例，内容平台中立，安卓、iOS、网页、后台及鸿蒙应用的设计都适用。"
+description: "用户提到 UX 设计、用户体验、设计规范、交互设计、界面布局、组件选型、设计走查、设计评审、多设备适配、动效设计 时必须使用本技能。基于华为官方 UX 设计指南整理的 152 篇设计参考：设计原则、组件、布局、交互、多设备适配、动效与行业案例，默认提取适用于网页、后台、安卓、iOS 等场景的通用设计方法；鸿蒙系统专用资料仅在目标平台匹配时按需加载，不作为跨平台实现规范。"
 version: 1.0.0
 author: scraped from developer.huawei.com
 tags: [harmonyos, ux, design-guide, components, multi-device, responsive]
@@ -18,7 +18,12 @@ tags: [harmonyos, ux, design-guide, components, multi-device, responsive]
 
 ## 使用方式
 
-查询特定主题时，直接读取对应 `references/` 子目录中的 `.md` 文件。每个文件包含原始指南的完整内容（含来源链接）。
+默认按通用 UX 需求，仅加载对应主题的参考文件，不通读整套资料。原始内容及来源均保留；原文中的鸿蒙组件名称、尺寸单位、API 和系统交互不自动成为其他平台的要求。
+
+- **通用设计默认入口**：01 设计原则、02 的色彩/排版/间距、03–08 组件设计、09 响应式布局、10 交互、11 多设备、15 输入设备、16 动效、17 行业案例。提取信息层级、可读性、反馈、布局与可访问性方法，再适配目标平台。
+- **仅对应平台时加载**：13 元服务、14 系统特性（实况窗、锁屏通知、服务卡片、状态栏等）、12 的元服务标准、02 的 HarmonyOS Symbol，以及 18 中华为账号/支付、NFC碰一碰、近场发现、智慧握持等。用户明确开发 HarmonyOS 或要求比较平台差异时再读取；网页或 iOS 的类似能力应另查对应平台文档，不直接套用鸿蒙能力或 API。
+- **混合章节**：12 UX标准、18 补充内容及其他章节中的系统能力，只保留可迁移的设计思路，输出中分别标注“通用建议”和“HarmonyOS 专用”。未指定平台时默认通用，不主动引入系统集成。
+- **大文件按需读取**：`references/02-visual-design/harmonyos-symbol.md` 保留正文与来源；动效策略原始长表格已无损抽离为同目录 `harmonyos-symbol-motion-table.html`。只在核对动效素材时用浏览器查看该表格，禁止全文读取内嵌资源。
 
 ---
 
@@ -72,11 +77,11 @@ tags: [harmonyos, ux, design-guide, components, multi-device, responsive]
 通用UX标准、折叠屏标准、大屏标准、PC标准、智慧屏标准、穿戴标准、元服务标准。
 - `general-ux-standard.md` / `foldable-standard.md` / `large-screen-standard.md` / `pc-standard.md` / `smart-screen-standard.md` / `wearable-standard.md` / `meta-service-standard.md`
 
-### 13 - 元服务 (`references/13-meta-service/`)
+### 13 - 元服务（HarmonyOS 专用，按需加载） (`references/13-meta-service/`)
 元服务概述、元服务要素、元服务场景、服务卡片UX。
 - `meta-service-overview.md` / `meta-service-elements.md` / `meta-service-scenarios.md` / `service-widget-ux.md`
 
-### 14 - 系统特性 (`references/14-system-features/`)
+### 14 - 系统特性（HarmonyOS 专用，按需加载） (`references/14-system-features/`)
 启动页、实况窗、多窗口、通知、画中画、服务卡片、状态栏、系统能力等系统级特性。
 - `system-features.md` / `launch-page.md` / `live-view.md` / `multi-window.md` / `notification.md` / `pip.md` / `service-widget-system.md` / `statusbar.md` / `system-capabilities.md`
 

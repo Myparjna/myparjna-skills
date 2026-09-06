@@ -16,8 +16,8 @@ Search and discover AI models on [ModelScope](https://modelscope.cn) — China's
 
 ## Prerequisites
 
-- Python 3.6+
-- `requests` library (`pip install requests`)
+- Python 3.9+（脚本使用 `list[dict]`；当前 PyPI ModelScope SDK 另要求 Python 3.10+）
+- `requests` library (`uv pip install requests`)
 - **仅搜索功能**：不需要安装 modelscope CLI，搜索脚本只依赖 `requests`
 - **下载模型**（搜索后的下一步）：需要 `pip install modelscope`
 
@@ -74,6 +74,8 @@ python <skill_dir>/scripts/search_models.py --model PaddlePaddle/PaddleOCR-VL
 ## Notes
 
 - The search API uses an undocumented ModelScope endpoint discovered via SDK source analysis
-- Results are sorted locally (API does not support server-side sorting)
+- Results are sorted only within the fetched API page, NOT globally. Fetch size is min(limit × 2, 100); `--page` selects that API page. `--page >= 1`, `--limit 1..100`. JSON reports `sort_scope`, `page`, `page_size`, and `fetched`.
+- Search calls the HTTP API directly through requests, not the SDK or CLI. Detail uses exact `GET /api/v1/models/{org}/{name}`, verified against official SDK v1.37.1 `HubApi.get_model(revision=None)`.
+- Request failures emit a stable JSON error on stderr and exit 1; argparse errors exit 2.
 - Search is fuzzy matching on model name
 - See `references/api-notes.md` for API details

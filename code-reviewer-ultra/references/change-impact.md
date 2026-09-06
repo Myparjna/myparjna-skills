@@ -18,7 +18,7 @@ Quote the relevant spec line or say `no spec available`. Do not infer a missing 
 
 ### Standards axis
 
-Check repository sources such as `AGENTS.md`, `CONTRIBUTING.md`, `CODING_STANDARDS.md`, linters, formatters, type configuration, and nearby established patterns. Cite the source and rule. Keep generic smells as labelled heuristics and let documented standards override them.
+Check relevant repository instructions, type configuration, and established patterns as evidence for concrete behavior. Cite the source and rule where useful; naming, style, architecture preferences, and missing tests alone are not independent bugs, even when documented standards mention them.
 
 ## Breaking-change surfaces
 
@@ -36,9 +36,9 @@ For each suspected break, record old contract, new contract, affected caller, mi
 
 ## Change size
 
-- Mechanical changes: use repository context; do not apply a generic line limit blindly.
-- Complex logic: treat more than 500 changed lines as a staging warning.
-- Any change: treat more than 800 changed lines as a reviewability warning.
+- Judge small changes by behavioral impact and dependencies, not line count alone.
+- Start with the diff, relevant functions, and necessary callers/tests; do not read whole files when that evidence suffices.
+- Expand context for public contracts, security, concurrency, migrations, or unresolved behavior; use size only as a secondary staging signal.
 
 Use the actual diff and dependencies to propose the smallest coherent stage. Do not recommend arbitrary splitting that breaks a runnable behavior boundary.
 

@@ -1,6 +1,6 @@
 # Review Checklist
 
-Use this as an adaptive matrix, not as proof that every box was checked mechanically.
+Use this as an adaptive matrix, not as proof that every box was checked mechanically. Findings must identify a bug/correctness defect or an actually consequential security, performance, or reliability regression. Naming, style, architecture preferences, and missing tests alone are not bugs; use those sections only as evidence for concrete behavior or as verification limitations.
 
 ## Contents
 
@@ -17,7 +17,7 @@ Use this as an adaptive matrix, not as proof that every box was checked mechanic
 - [ ] State the intended change in one sentence.
 - [ ] List every changed file, including untracked files and deletions.
 - [ ] Identify generated/vendor/lock files and apply documented exclusions.
-- [ ] Read the full current file for every changed source file.
+- [ ] Read diffs, relevant functions, and necessary callers/tests; expand for public contracts, security, concurrency, migrations, or insufficient evidence, not merely file size.
 - [ ] Find important callers, implementations, configuration, migrations, and tests.
 
 ## Core checks
@@ -42,7 +42,7 @@ Use this as an adaptive matrix, not as proof that every box was checked mechanic
 
 ### Change impact
 
-- [ ] Search all call sites and external integration surfaces.
+- [ ] Search necessary call sites; expand to all relevant consumers when shared/public contracts or other cross-module impact require it.
 - [ ] Check API, CLI, config, schema, serialization, session/resume, and error semantics.
 - [ ] Check migration compatibility, rollback, versioning, and feature flags.
 - [ ] Check whether the diff is too large; propose the smallest coherent split when needed.

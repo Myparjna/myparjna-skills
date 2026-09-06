@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-11T15:52:18.031029+08:00",
+  "project_root": "C:\\Users\\mypra\\Desktop\\VibeCoding指南\\skills测评项目\\09-myparjna技能开发\\project-handoff\\TempFiles\\demo-project",
+  "baseline_available": true,
+  "changed_report_fields": [
+    "git"
+  ],
+  "key_file_changes": {
+    "added": [],
+    "removed": [],
+    "modified": []
+  },
+  "recommendations": [
+    {
+      "document": "AI-SERVICES.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "API.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "ARCHITECTURE.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "DATABASE.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "DEPLOYMENT.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "ENVIRONMENT.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "INFRASTRUCTURE.md",
+      "action": "create",
+      "reason": "当前 ProjectDoc 中缺少该文档",
+      "changed_report_fields": [
+        "git"
+      ]
+    },
+    {
+      "document": "KNOWN-ISSUES.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "MAINTENANCE.md",
+      "action": "update",
+      "reason": "相关扫描事实发生变化",
+      "changed_report_fields": [
+        "git"
+      ]
+    },
+    {
+      "document": "MODULES.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "README.md",
+      "action": "update",
+      "reason": "相关扫描事实发生变化",
+      "changed_report_fields": [
+        "git"
+      ]
+    },
+    {
+      "document": "REGRESSION-TEST.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "RUNBOOK.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    },
+    {
+      "document": "USAGE.md",
+      "action": "preserve",
+      "reason": "未发现直接相关的扫描事实变化，保留旧内容",
+      "changed_report_fields": []
+    }
+  ],
+  "ai_instructions": [
+    "先阅读旧文档和 changed key files，再补充语义层面的影响说明。",
+    "只原地修改 action=create/update/review 的文档；action=preserve 的文档不得重写。",
+    "人工补充、历史决策和运维经验默认保留；只有新证据明确推翻时才修改。",
+    "完成后运行 verify_handoff.py，不得把本计划当作已完成的更新。"
+  ],
+  "git_changes": {
+    "available": true,
+    "range": "a1d5a93c2cc8dca84394a68b65c22d04dd6cf38b..HEAD",
+    "commits": [
+      "ec81c66 2026-08-11 feat: add handoff feature"
+    ],
+    "diff_summary": "21 files changed, 2284 insertions(+), 6 deletions(-)",
+    "changed_files": [
+      "ProjectDoc/.handoff/analysis-report.previous.json",
+      "ProjectDoc/.handoff/analysis-report.verified.json",
+      "ProjectDoc/AI-SERVICES.md",
+      "ProjectDoc/API.md",
+      "ProjectDoc/ARCHITECTURE.md",
+      "ProjectDoc/DATABASE.md",
+      "ProjectDoc/DEPLOYMENT.md",
+      "ProjectDoc/ENVIRONMENT.md",
+      "ProjectDoc/KNOWN-ISSUES.md",
+      "ProjectDoc/MAINTENANCE.md",
+      "ProjectDoc/MODULES.md",
+      "ProjectDoc/README.md",
+      "ProjectDoc/REGRESSION-TEST.md",
+      "ProjectDoc/RUNBOOK.md",
+      "ProjectDoc/USAGE.md",
+      "ProjectDoc/analysis-report.json",
+      "TempScr/project-handoff-plan.json",
+      "TempScr/project-handoff-plan.md",
+      "TempScr/project-handoff-update-plan.json",
+      "TempScr/project-handoff-update-plan.md",
+      "src/index.js"
+    ],
+    "uncommitted_count": 0
+  }
+}

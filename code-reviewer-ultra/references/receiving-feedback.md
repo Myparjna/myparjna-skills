@@ -1,6 +1,6 @@
 # Receiving Code Review Feedback
 
-Use this workflow when the user asks to process reviewer comments or external review output.
+Use this workflow when the user asks to process reviewer comments or external review output. Remain read-only unless the user explicitly authorizes review-and-fix; implementation and test-editing steps below apply only within that authorization and scope.
 
 ## Response loop
 

@@ -1,6 +1,6 @@
 # Review Report Template
 
-Fill every section that applies. Never invent commands, coverage, or test results.
+For small, low-impact changes, report only scope/verdict and findings (location, evidence, impact), actual verification results, and limitations including skipped coverage. Use the full template below only when impact, complexity, or the user calls for it. Standards/preferences or missing tests alone are not bug findings. Never invent commands, coverage, or test results.
 
 ```markdown
 # Code Review: [target]

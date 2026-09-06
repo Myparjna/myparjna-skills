@@ -1,3 +1,4 @@
+#Requires -Version 7.0
 param(
     [Parameter(Mandatory = $true)][string]$TargetUrl,
     [string]$Domain = "s.ee",
@@ -19,6 +20,8 @@ if ($CustomSlug) {
 
 Invoke-RestMethod `
     -Method Post `
+    -TimeoutSec 60 `
+    -ErrorAction Stop `
     -Uri "https://s.ee/api/v1/shorten" `
     -Headers @{ Authorization = $env:SEE_API_KEY } `
     -ContentType "application/json" `

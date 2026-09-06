@@ -10,13 +10,16 @@ if [[ -z "${SEE_API_KEY:-}" ]]; then
   exit 1
 fi
 
-PAYLOAD="{\"domain\":\"${DOMAIN}\",\"target_url\":\"${TARGET_URL}\""
-if [[ -n "${CUSTOM_SLUG}" ]]; then
-  PAYLOAD="${PAYLOAD},\"custom_slug\":\"${CUSTOM_SLUG}\""
-fi
-PAYLOAD="${PAYLOAD}}"
+PAYLOAD=$(python - "$DOMAIN" "$TARGET_URL" "$CUSTOM_SLUG" <<'PY'
+import json, sys
+body = dict(domain=sys.argv[1], target_url=sys.argv[2])
+if sys.argv[3]:
+    body['custom_slug'] = sys.argv[3]
+print(json.dumps(body))
+PY
+)
 
-curl -sS \
+curl --fail-with-body -sS --connect-timeout 10 --max-time 60 \
   -X POST "https://s.ee/api/v1/shorten" \
   -H "Authorization: ${SEE_API_KEY}" \
   -H "Content-Type: application/json" \

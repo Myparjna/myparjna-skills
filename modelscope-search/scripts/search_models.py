@@ -5,6 +5,20 @@ import argparse
 import io
 import json
 import sys
+from urllib.parse import quote
+
+
+def validate_pagination(page, limit):
+    if page < 1 or not 1 <= limit <= 100:
+        raise ValueError("page must be >= 1; limit must be 1..100")
+
+
+def response_data(response):
+    response.raise_for_status()
+    data = response.json()
+    if not isinstance(data, dict) or data.get("Code") != 200 or not isinstance(data.get("Data"), dict):
+        raise RuntimeError("Invalid or unsuccessful API response")
+    return data["Data"]
 
 try:
     import requests
@@ -21,43 +35,35 @@ HEADERS = {
 
 def search_models(query: str, page: int = 1, page_size: int = 20) -> dict:
     """Search models by keyword."""
+    validate_pagination(page, page_size)
     body = {"Name": query, "PageNumber": page, "PageSize": page_size}
     r = requests.put(API_URL, json=body, headers=HEADERS, timeout=15)
-    r.raise_for_status()
-    data = r.json()
-    if data.get("Code") != 200:
-        raise RuntimeError(f"API error: {data.get('Message', 'unknown')}")
-    return data["Data"]
+    return response_data(r)
 
 
 def get_model_detail(model_id: str) -> dict:
     """Get details for a specific model (org/name format)."""
-    body = {"Path": model_id.split("/")[0] if "/" in model_id else model_id, "PageNumber": 1, "PageSize": 50}
-    r = requests.put(API_URL, json=body, headers=HEADERS, timeout=15)
-    r.raise_for_status()
-    data = r.json()
-    if data.get("Code") != 200:
-        raise RuntimeError(f"API error: {data.get('Message', 'unknown')}")
-    models = data.get("Data", {}).get("Models", [])
-    name_part = model_id.split("/")[1] if "/" in model_id else model_id
-    for m in models:
-        if m.get("Name") == name_part or m.get("Path") == model_id:
-            return m
-    return None
+    parts = model_id.split("/")
+    if len(parts) != 2 or any(not p.strip() or p in (".", "..") for p in parts):
+        raise ValueError("model must be org/name")
+    # Verified against official HubApi.get_model(revision=None), v1.37.1.
+    url = API_URL + "/".join(quote(p, safe="") for p in parts)
+    return response_data(requests.get(url, headers=HEADERS, timeout=15))
 
 
 def format_model(m: dict) -> dict:
     """Extract relevant fields from a model dict."""
-    tasks = m.get("Tasks", [])
+    # ModelScope can return `Tasks: null` for community checkpoints.
+    tasks = m.get("Tasks") or []
     task_names = [t.get("TaskChineseName") or t.get("Task", "") for t in tasks[:3]]
     return {
         "path": f"{m.get('Path', '?')}/{m.get('Name', '?')}",
         "name": m.get("Name", ""),
         "chinese_name": m.get("ChineseName", ""),
-        "downloads": m.get("Downloads", 0),
-        "stars": m.get("Stars", 0),
+        "downloads": (m.get("Downloads") or 0),
+        "stars": (m.get("Stars") or 0),
         "license": m.get("License", ""),
-        "tags": m.get("Tags", [])[:6],
+        "tags": (m.get("Tags") or [])[:6],
         "tasks": task_names,
         "libraries": m.get("Libraries", []),
     }
@@ -86,9 +92,12 @@ def main():
     parser.add_argument("query", nargs="?", help="Search keyword (e.g., 'OCR', 'Qwen')")
     parser.add_argument("--model", help="Get details for a specific model (org/name)")
     parser.add_argument("--sort", choices=["downloads", "stars"], default="downloads", help="Sort by (default: downloads)")
+    parser.add_argument("--page", type=int, default=1, help="API page (>=1)")
     parser.add_argument("--limit", type=int, default=15, help="Max results (default: 15)")
     parser.add_argument("--json", action="store_true", dest="json_output", help="Output as JSON")
     args = parser.parse_args()
+    if args.page < 1 or not 1 <= args.limit <= 100:
+        parser.error("page must be >= 1; limit must be 1..100")
 
     if args.model:
         m = get_model_detail(args.model)
@@ -105,11 +114,10 @@ def main():
         return
 
     if not args.query:
-        parser.print_help()
-        sys.exit(1)
+        parser.error("query or --model is required")
 
     page_size = min(args.limit * 2, 100)  # fetch extra for sorting
-    data = search_models(args.query, page_size=page_size)
+    data = search_models(args.query, page=args.page, page_size=page_size)
     models = data.get("Models", [])
     total = data.get("TotalCount", 0)
 
@@ -120,10 +128,10 @@ def main():
     formatted = formatted[: args.limit]
 
     if args.json_output:
-        output = {"query": args.query, "total": total, "showing": len(formatted), "sort": args.sort, "models": formatted}
+        output = {"query": args.query, "total": total, "showing": len(formatted), "sort": args.sort, "sort_scope": "fetched_page_only", "page": args.page, "page_size": page_size, "fetched": len(models), "models": formatted}
         print(json.dumps(output, ensure_ascii=False, indent=2))
     else:
-        print(f"\n  ModelScope Search: '{args.query}' | Total: {total} | Showing: {len(formatted)} | Sort: {args.sort}\n")
+        print(f"\n  ModelScope Search: '{args.query}' | Total: {total} | Showing: {len(formatted)} | Sort: {args.sort} (fetched page only, not global ranking) | Page: {args.page}\n")
         print_table(formatted)
         print()
 
@@ -138,4 +146,15 @@ if sys.platform == "win32":
             setattr(sys, _stream_name, io.TextIOWrapper(_stream.buffer, encoding="utf-8", errors="replace"))
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except requests.HTTPError as e:
+        status = e.response.status_code if e.response is not None else None
+        print(json.dumps({"error": {"code": "HTTP_ERROR", "status": status}}), file=sys.stderr)
+        sys.exit(1)
+    except requests.RequestException:
+        print(json.dumps({"error": {"code": "NETWORK_ERROR"}}), file=sys.stderr)
+        sys.exit(1)
+    except (ValueError, RuntimeError, TypeError, KeyError, AttributeError):
+        print(json.dumps({"error": {"code": "INVALID_RESPONSE_OR_ARGUMENT"}}), file=sys.stderr)
+        sys.exit(1)
