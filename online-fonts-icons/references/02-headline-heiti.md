@@ -1,6 +1,7 @@
-# ② Headline Heiti / 标题黑体（5 款）
+# ② Headline Heiti / 标题黑体（14 款）
 
 适合大标题、品牌名、海报主视觉、数字大屏数据标题等需要视觉冲击力的场景。
+2026-09-10 与「免费字体预览」app.js 全量对齐并逐款实测可用；⭐ 为预览站推荐款。
 
 ---
 
@@ -42,7 +43,7 @@ h1 { font-family: 'DingTalk JinBuTi', sans-serif; }
 
 ---
 
-## 抖音美好体 Bold
+## 抖音美好体 Bold ⭐
 
 - **font-family**: `DouyinSans` （⚠️ 实测：CSS 实际声明为 DouyinSans，无空格，不是 Douyin Sans）
 - **风格**: 简洁现代的粗圆体，笔画圆润饱满，适合年轻化产品/社交类标题
@@ -118,6 +119,158 @@ h1 { font-family: 'Smiley Sans Oblique', sans-serif; }
 
 ```css
 h1 { font-family: '摇醒青年黑1.0', sans-serif; }
+```
+
+---
+
+## 荆南缘默体
+
+- **font-family**: `Kingnamype Yuanmo SC` （⚠️ 实测：CSS 实际声明为英文 ID）
+- **风格**: 沉稳静谧，书法韵味浓厚，适合高端文化/禅意/茶道类标题
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/133/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/133/main/result.css">
+```
+
+```css
+h1 { font-family: 'Kingnamype Yuanmo SC', serif; }
+```
+
+---
+
+## 无界黑
+
+- **font-family**: `Unbounded Sans` （⚠️ 实测：CSS 实际声明为英文 ID）
+- **风格**: 极简无界的创意黑体，字形张力强，适合科技品牌/概念标题
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/18/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/18/main/result.css">
+```
+
+```css
+h1 { font-family: 'Unbounded Sans', sans-serif; }
+```
+
+---
+
+## 金字社扁正体 ⭐
+
+- **font-family**: `JinzisheBianzheng` （⚠️ 实测：CSS 实际声明为英文 ID）
+- **风格**: 扁平紧凑的现代字形，短标题辨识度高，适合产品标签/短标题
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/322/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/322/main/result.css">
+```
+
+```css
+h1 { font-family: 'JinzisheBianzheng', sans-serif; }
+```
+
+---
+
+## 寒蝉有机体 ⭐
+
+- **font-family**: `寒蝉有机体`
+- **风格**: 自然流线造型，有机形态字体，曲线优美不带直线棱角
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/362/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/362/main/result.css">
+```
+
+```css
+h1 { font-family: '寒蝉有机体', sans-serif; }
+```
+
+---
+
+## 金字社真好体 ⭐
+
+- **font-family**: `JinzisheZhenhao` （⚠️ 实测：CSS 实际声明为英文 ID）
+- **风格**: 圆润亲和，笔画有趣，轻松感明显，适合社交/生活方式标题
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/320/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/320/main/result.css">
+```
+
+```css
+h1 { font-family: 'JinzisheZhenhao', sans-serif; }
+```
+
+---
+
+## 纳米扁界黑 ⭐
+
+- **font-family**: `NanoByongGyeHei` （⚠️ 实测：CSS 实际声明为英文 ID）
+- **风格**: 扁平窄体，视觉密度高，具有设计感，适合科技/品牌标题
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/794/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/794/main/result.css">
+```
+
+```css
+h1 { font-family: 'NanoByongGyeHei', sans-serif; }
+```
+
+---
+
+## 典迹悦动 ⭐
+
+- **font-family**: `Monu YueDong` （⚠️ 实测：CSS 实际声明为英文 ID）
+- **风格**: 带衬线的跃动展示字形，古典与活力并存，适合文化/艺术海报
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/2131/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/2131/main/result.css">
+```
+
+```css
+h1 { font-family: 'Monu YueDong', serif; }
+```
+
+---
+
+## 卓特悦动黑 ⭐
+
+- **font-family**: `ZT YueDongHei` （⚠️ 实测：CSS 实际声明为英文 ID）
+- **风格**: 创意衬线黑体，节奏明快，标题感强，适合品牌/视觉标题
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/2129/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/2129/main/result.css">
+```
+
+```css
+h1 { font-family: 'ZT YueDongHei', serif; }
 ```
 
 ---

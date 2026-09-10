@@ -1,6 +1,7 @@
-# ③ Song / Kai / Calligraphy / 宋体楷体书法风格（10 款）
+# ③ Song / Kai / Calligraphy / 宋体楷体书法风格（9 款）
 
 适合传统文化、文艺出版物、古风 UI、书法展示等场景。
+2026-09-10 与「免费字体预览」app.js 全量对齐：荆南缘默体按预览站分类迁入 `02-headline-heiti.md`。
 
 ---
 
@@ -26,7 +27,7 @@ h1 { font-family: 'Alimama DongFangDaKai', serif; }
 ## 上图东观体（粗体）
 
 - **font-family**: `STDongGuanTi`
-- **风格**: 宋体与楷体的融合体，横细竖粗带轻微右倾，有传统书卷气又不失���代感
+- **风格**: 宋体与楷体的融合体，横细竖粗带轻微右倾，有传统书卷气又不失现代感
 - **来源**: ZeoSeven (已替换原 chinese-fonts-cdn)
 - **原址**: https://fonts.zeoseven.com/items/488/
 
@@ -133,25 +134,6 @@ h1 { font-family: 'ChillHuoSong_F', serif; }
 
 ```css
 h1 { font-family: 'MaoKenWangFengYaSong', serif; }
-```
-
----
-
-## 荆南缘默体
-
-- **font-family**: `Kingnamype Yuanmo SC` （⚠️ 实测：CSS 实际声明为英文 ID）
-- **风格**: 沉稳静谧，书法韵味浓厚，适合高端文化/禅意/茶道类场景
-- **来源**: ZeoSeven
-- **原址**: https://fonts.zeoseven.com/items/133/
-
-### CDN
-
-```html
-<link rel="stylesheet" href="https://fontsapi.zeoseven.com/133/main/result.css">
-```
-
-```css
-h1 { font-family: 'Kingnamype Yuanmo SC', serif; }
 ```
 
 ---

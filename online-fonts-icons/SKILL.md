@@ -1,13 +1,13 @@
 ---
 name: online-fonts-icons
-description: "用户提到 中文字体、网页字体、在线字体、图标库、CDN 字体、图标颜色 时必须使用本技能。提供 35 款中文字体与 5 套图标库的 CDN 引入代码、字体声明与配色建议。"
+description: "用户提到 中文字体、网页字体、在线字体、图标库、CDN 字体、图标颜色 时必须使用本技能。提供 45 款中文字体与 5 套图标库的 CDN 引入代码、字体声明与配色建议。"
 ---
 
 # Online Fonts & Icons Skill
 
 CDN-based Chinese font and icon library integration guide. Availability is URL-, time- and network-specific; a successful HTTP response is not proof of a usable font. License terms must be checked per font and version; this guide does not certify all fonts as free for commercial use.
 
-核验依据（2026-09-06 全量复核）：只读用户 `C:/Users/mypra/Desktop/VibeCoding指南/免费资源合集/免费字体预览/app.js` 中的全部 45 款字体配置（family、cdn、cdnType），逐款核验 CSS 与字体文件。**45/45 全部可用**：CSS 返回 200，字体文件返回 200 且魔数校验通过（woff2/wOFF 等）。核验明细见 `TempFiles/0906-字体全量核验/results.json`。
+核验依据（2026-09-10 全量复核）：只读用户 `C:/Users/mypra/Desktop/VibeCoding指南/免费资源合集/免费字体预览/app.js` 中的全部 45 款字体配置（family、cdn、cdnType），逐款核验 CSS 与字体文件。**45/45 全部可用**：CSS 返回 200，字体文件返回 200 且魔数校验通过（woff2/wOFF 等），各款 `@font-face` 声明的 font-family 与清单一致。核验明细见 `new-frontend-design/TempFiles/0910-字体全量核验/results.json`。
 
 **ZeoSeven（fontsapi.zeoseven.com）反爬提醒**：用脚本裸请求（无浏览器 User-Agent）会得到 HTTP 204 空响应，这不代表字体失效。判活必须带浏览器请求头（User-Agent + Accept），或直接在浏览器/页面中验证；不得凭脚本 204 断定字体停用。
 
@@ -68,29 +68,35 @@ Use on: quick-action cards, stat cards, list items, light toolbars, empty states
 
 → Full code: `references/01-body-fonts.md`
 
-### ② Headline Heiti (标题黑体, 6 fonts) — HEADLINES/TITLES ONLY
+### ② Headline Heiti (标题黑体, 14 fonts) — HEADLINES/TITLES ONLY
 **Top picks by scenario:**
 - **后台系统/科技产品标题** → `DingTalk JinBuTi`（钉钉进步体）
 - **企业官网/正式报告** → `Aidian FengYaHei`（爱点风雅黑）
 - **品牌LOGO/国风海报** → `WSQuanXing`（万事全兴体）
-- **年轻化/社交产品** → `DouyinSans`（抖音美好体 Bold）
+- **年轻化/社交产品** → `DouyinSans`（抖音美好体 Bold）⭐
 - **创意社区/开源项目** → `Smiley Sans Oblique`（得意黑）
 - **活动/音乐/潮流** → `摇醒青年黑1.0`
+- **高端文化/禅意标题** → `Kingnamype Yuanmo SC`（荆南缘默体）
+- **科技品牌/概念标题** → `Unbounded Sans`（无界黑）、`NanoByongGyeHei`（纳米扁界黑）⭐
+- **产品标签/短标题** → `JinzisheBianzheng`（金字社扁正体）⭐
+- **社交/生活方式** → `JinzisheZhenhao`（金字社真好体）⭐
+- **自然有机风格** → `寒蝉有机体` ⭐
+- **文化/艺术海报** → `Monu YueDong`（典迹悦动）⭐、`ZT YueDongHei`（卓特悦动黑）⭐
 
 → Full code: `references/02-headline-heiti.md`
 
-### ③ Song/Kai/Calligraphy (宋体楷体书法, 10 fonts) — CULTURAL/ARTISTIC TITLES
+### ③ Song/Kai/Calligraphy (宋体楷体书法, 9 fonts) — CULTURAL/ARTISTIC TITLES
 Top picks: `LXGW WenKai GB Screen`（霞鹜文楷, 可做正文）, `STDongGuanTi`（上图东观体）
 
 → Full code: `references/03-song-kai-calligraphy.md`
 
-### ④ Round/Cute/Handwrite (圆体可爱手写, 13 fonts) — CUTE/UI/KIDS APPS
-Top picks: `寒蝉半圆体`（通用UI首选）, `JiangChengYuanTi`（江城圆体，不出错通用型）, `975Maru SC Medium`（日系）
+### ④ Round/Cute/Handwrite (圆体可爱手写, 14 fonts) — CUTE/UI/KIDS APPS
+Top picks: `寒蝉半圆体`（通用UI首选）, `JiangChengYuanTi`（江城圆体，不出错通用型）, `975Maru SC Medium`（日系）, `荆南波波黑`（社区/儿童/活动）, `Kingnammm Maiyuan 2`（荆南麦圆体，生活方式）
 
 → Full code: `references/04-round-cute-handwrite.md`
 
-### ⑤ Art/Special (艺术特殊, 2 fonts) — LOGO/POSTER ONLY, USE SPARINGLY
-`zcoolwenyiti`（站酷文艺体）, `zihunbiantaoti`（字魂扁桃体）
+### ⑤ Art/Special (艺术特殊, 4 fonts) — LOGO/POSTER ONLY, USE SPARINGLY
+`zcoolwenyiti`（站酷文艺体）, `LXGW Marker Gothic`（霞鹜漫黑）, `WD-XL Lubrifont SC`（WD-XL 滑油字）, `JiangChengJieXingTi`（江城解星体）
 
 → Full code: `references/05-art-special.md`
 
@@ -136,6 +142,7 @@ Also: `x12y16pxMaruMonica`（莫妮卡像素圆体）
 - 目哉像素体 — No CDN found
 - 寒蝉全圆体 Bold — ZeoSeven 只提供 Regular 字重，无 Bold 切片
 - Maple Mono CN (Thin/Regular/Bold) — Not a pixel font, use for code only
+- 字魂扁桃体 (zihunbiantaoti) — 有 ZeoSeven 源（405），但 2026-09-10 未收录于最新实测清单，用前先实测
 
 ## ⚠️ CRITICAL: font-family 命名陷阱（实测得出）
 
@@ -161,6 +168,16 @@ Also: `x12y16pxMaruMonica`（莫妮卡像素圆体）
 | 悠哉字体 | `Yozai` | `Yozai Medium` |
 | 站酷文艺体 | `站酷文艺体` | `zcoolwenyiti` |
 | 点点像素体-方形 | `点点像素 方` | `点点像素体-方形` |
+| 无界黑 | `无界黑` | `Unbounded Sans` |
+| 金字社扁正体 | `金字社扁正体` | `JinzisheBianzheng` |
+| 金字社真好体 | `金字社真好体` | `JinzisheZhenhao` |
+| 纳米扁界黑 | `纳米扁界黑` | `NanoByongGyeHei` |
+| 典迹悦动 | `典迹悦动` | `Monu YueDong` |
+| 卓特悦动黑 | `卓特悦动黑` | `ZT YueDongHei` |
+| 写意体 | `写意体` | `YShi-Written` |
+| 荆南麦圆体 | `荆南麦圆体` | `Kingnammm Maiyuan 2` |
+| WD-XL 滑油字 | `WD-XL 滑油字` | `WD-XL Lubrifont SC` |
+| 江城解星体 | `江城解星体` | `JiangChengJieXingTi` |
 
 **验证方法**：浏览器 DevTools → Network → 加载 CSS → 查看 `@font-face { font-family: "..." }`，或用 `document.fonts.load('20px "family名"', '实际目标文字')` 检查返回的 FontFace 数组非空且各项 status 为 loaded，再在 DevTools 的 Rendered Fonts 检查实际文字使用的字体。仅 Promise 成功或 `document.fonts.check()` 为 true 不足以证明目标字体已生效。**family 名写错时，CSS 即使 200 也会静默回退到系统字体，肉眼看不出但字体没生效。**
 

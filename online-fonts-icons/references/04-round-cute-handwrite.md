@@ -1,6 +1,7 @@
-# ④ Round / Cute / Handwrite / 圆体可爱手写风格（12 款）
+# ④ Round / Cute / Handwrite / 圆体可爱手写风格（14 款）
 
 适合 UI 界面、可爱/萌系产品、儿童类、日系设计、手写风格等场景。
+2026-09-10 与「免费字体预览」app.js 全量对齐：寒蝉有机体迁入 `02-headline-heiti.md`，霞鹜漫黑迁入 `05-art-special.md`，新增写意体/荆南波波黑/荆南麦圆体。
 
 ---
 
@@ -88,21 +89,6 @@
 
 ---
 
-## 霞鹜漫黑
-
-- **font-family**: `LXGW Marker Gothic`
-- **风格**: 卡通化马克笔风格字体，笔画粗细不均带手写感，活泼有趣但不幼稚
-- **来源**: cn-fontsource (jsDelivr)
-- **原址**: https://lxgw.github.io/
-
-### CDN
-
-```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cn-fontsource-lxgw-marker-gothic-regular/font.css">
-```
-
----
-
 ## 975 圆体 Medium
 
 - **font-family**: `975Maru SC Medium`
@@ -121,7 +107,7 @@
 ## 莫妮卡像素圆体
 
 - **font-family**: `x12y16pxMaruMonica` （⚠️ 实测：CSS 实际声明为连写无空格，不是 X12Y16PX Maru Monica）
-- **风格**: 像素风格+圆角结合，8-bit 复古感但笔画圆润
+- **风格**: 像素风格+圆角结合，8-bit 复古感但笔画圆润（同时收录于 ⑥ 等宽像素科技）
 - **来源**: cn-fontsource (jsDelivr)
 - **原址**: https://fonts.zeoseven.com/
 
@@ -193,17 +179,47 @@
 
 ---
 
-## 寒蝉有机体
+## 写意体
 
-- **font-family**: `寒蝉有机体`
-- **风格**: 自然流线造型，有机形态字体，曲线优美不带直线棱角
+- **font-family**: `YShi-Written` （⚠️ 实测：CSS 实际声明为英文 ID）
+- **风格**: 中性笔手写质感，简体字形自然随性，适合创意标题/手写文案
 - **来源**: ZeoSeven
-- **原址**: https://fonts.zeoseven.com/items/362/
+- **原址**: https://fonts.zeoseven.com/items/802/
 
 ### CDN
 
 ```html
-<link rel="stylesheet" href="https://fontsapi.zeoseven.com/362/main/result.css">
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/802/main/result.css">
+```
+
+---
+
+## 荆南波波黑
+
+- **font-family**: `荆南波波黑`
+- **风格**: 圆润夸张的波波造型，亲和又有辨识度，适合社区/儿童/活动标题
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/298/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/298/main/result.css">
+```
+
+---
+
+## 荆南麦圆体
+
+- **font-family**: `Kingnammm Maiyuan 2` （⚠️ 实测：CSS 实际声明为英文 ID 带版本号）
+- **风格**: 麦穗般圆润的手写圆体，轻松自然，适合生活方式/轻量标题
+- **来源**: ZeoSeven
+- **原址**: https://fonts.zeoseven.com/items/116/
+
+### CDN
+
+```html
+<link rel="stylesheet" href="https://fontsapi.zeoseven.com/116/main/result.css">
 ```
 
 ---
