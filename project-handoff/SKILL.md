@@ -5,160 +5,108 @@ description: "用户提到 交接文档、更新交接文档、重建交接文�
 
 # Project Handoff
 
-模式语义必须严格区分：`更新交接文档`/`更新文档` 默认是**增量更新**，先给出比对建议，再原地修改受影响章节；只有用户明确说 `重建交接文档`、`重新生成交接文档` 或同意完全重置时，才能使用 `--mode rebuild`。没有旧文档时使用首次创建模式。
+依据实际源码、配置、扫描报告和用户回答维护 `ProjectDoc/`。采用 8 份基础文档加按需专题。脚本需要 Python 3.11+，可用 `uv run --no-project python` 运行。
 
-## 硬性规则（MUST）
+## 按请求选择范围
 
-1. **必须按 Step 0 → 8 顺序执行，不得跳步。**
-2. 所有内容必须来自：扫描报告 `analysis-report.json`、你实际读过的源码文件、或用户的明确回答。不确定的内容写 `[需向交接人确认: 具体问题]`。
-3. 每个 `TODO(AI)` 必须被处理：要么填入真实内容，要么改写为 `[需向交接人确认: ...]`。
-4. `verify_handoff.py` 是质量门禁，有 FAIL 项时回到 Step 7 修复后再交付。
-5. 填写前先读技能目录下的 `fill-guide.md`，按其中的逐文件标准执行。
-6. 增量更新只改受影响文档；旧文档中的人工决策、业务约定和运维经验默认保留。
-7. 区分“检测到测试”“实际执行过”“执行通过”，只有实际执行并观察结果的测试才能记为通过。
+| 请求 | 执行范围 |
+|---|---|
+| 查看、解释 | 只读相关文档和必要源码，不扫描、不生成、不运行会推进基线的验收 |
+| 比对 | 定位、扫描、差异建议；不改交接正文、不推进验收基线 |
+| 更新 | 增量改受影响章节，补缺失文档，保留人工内容 |
+| 首次创建 | 无旧文档时创建并补全适用文档 |
+| 明确重建、重新生成 | 备份后 rebuild；不得把“更新”理解为重建 |
 
-## Workflow
+下列 5 阶段用于完整创建和更新，不要求所有请求执行全部阶段。明确且核实过的根目录可直接采用；查看请求完成阅读即可结束。
 
-### Step 0 — 先定位项目根目录和历史交接文档
+## 必须保留的要求
 
-启动目录不一定就是项目根目录，也可能是包含多个项目的工作区。正式扫描前必须先运行：
+- 内容必须来自扫描报告、实际读过的源码/配置或用户回答。不确定写 `[需向交接人确认: 具体问题]`。
+- 机器检测不等于业务事实。核对部署、变量用途、接口和模型调用；扫描不完整时补读。
+- 处理所有 TODO(AI)，不为凑数量编写功能、流程、目录或调用链。
+- 区分检测到测试、实际执行、执行通过；只有观察结果才写通过。
+- 保留人工决策、业务约定、运维经验。preserve 表示机器未发现影响，新源码证据可推翻并注明原因。
+- 创建、更新、重建后必须验收，修复 ERROR/CRITICAL 后再交付；查看与只做比对不运行验收。
+
+## 阶段 1：定位项目和模式
+
+仅在位置不明、多项目或首次探索时运行：
 
 ```bash
 python /absolute/path/to/project-handoff/scripts/discover_project.py --start . --max-depth 3
 ```
 
-脚本只输出候选，不替 AI 做最终选择。AI 必须检查候选的项目标志、路径、已有 `ProjectDoc`/`project-handoff`/`handoff` 目录、文档数量、`analysis-report.json` 是否存在，以及各目录的最新修改时间，然后选择一个真正的项目根目录：
+检查项目标志和已有交接目录，不能只凭修改时间选目录。单一明确目标直接采用；多个目标且用户意图不明时询问，禁止扫描整个父工作区。之后在选定项目根目录运行脚本。
 
-- 只有一个明显候选时直接选它。
-- 旧交接文档的修改时间只能作为线索，不能单独决定覆盖哪个目录。
-- 同一工作区有多个项目或多个同名交接目录时，必须向用户确认目标项目，禁止扫描父工作区。
-- 选定项目根目录已有 `ProjectDoc/` 时更新它，没有则在该根目录下创建。
+无旧文档 create；已有文档默认 update；仅明确同意完全重置时 rebuild。
 
-选定后，Step 1 至 Step 7 都必须在选定的项目根目录执行。发现报告可以用 `--output` 保存到临时位置，但不能把它当成交接文档。
-
-### Step 1 — 判断模式
-
-- 没有旧 `ProjectDoc/*.md`：`create`。
-- 用户说“更新”：`update`，不得清理旧文档。
-- 用户明确要求完全重置：`rebuild`；生成器会先备份旧目录到 `TempFiles/ProjectDoc_backup_<时间>/`。
-
-### Step 2 — 扫描项目并保留基线
+## 阶段 2：收集事实
 
 ```bash
 python /absolute/path/to/project-handoff/scripts/analyze_project.py
 ```
 
-生成 `ProjectDoc/analysis-report.json`，包含：框架、包管理器、monorepo 配置、语言运行时版本、依赖清单、Docker、Cloudflare(wrangler)、CI/CD（GitHub Actions / GitLab CI / Jenkins / CircleCI）、Kubernetes、Vercel/Netlify/VPS 部署痕迹、AI API 调用、环境变量（声明的 + 源码实际使用的 + 高熵值检测，真实 env 文件的值自动脱敏）、数据库（含 Cloudflare D1）、API 路由与 OpenAPI/Swagger 规范、Electron/Tauri/WinUI 桌面端、Go/Rust/Java/.NET/C/C++ 构建入口、嵌入式工程线索、本地推理引擎/模型文件、WSL 环境检测、MCP servers 配置、Claude Code skills/commands、AGENTS.md/GEMINI.md 等开发平台痕迹、局域网启动配置、前端 mock、监控、目录结构、Git 信息。
+生成 `ProjectDoc/analysis-report.json`。`.handoff/analysis-report.verified.json` 为稳定验收基线，重复扫描不推进它。报告包含重点文件和已扫描文本指纹；扫描范围有限，不能替代源码阅读。
 
-更新时，扫描器以最近一次验收通过的 `ProjectDoc/.handoff/analysis-report.verified.json` 为稳定基线，生成 `analysis-report.previous.json` 后再写入新报告；重复扫描不会推进基线。报告同时记录关键文件 SHA-256 和当前 git commit hash，供增量比对。
-
-### Step 3 — 生成交接计划并自动采用
+## 阶段 3：计划与影响检查
 
 ```bash
-python /absolute/path/to/project-handoff/scripts/plan_handoff.py
+python /absolute/path/to/project-handoff/scripts/plan_handoff.py --intent update
 ```
 
-产出 `TempScr/project-handoff-plan.md` 与 `.json`：判定模式（create/update/rebuild）、列出哪些文档生成/跳过（条件文档未检测到相关事实时自动跳过）、每份文档的 focus、扫描范围完整性。计划根据扫描事实自动采用；用户已明确意向时传 `--intent create|update|rebuild`。
+按实际模式替换 intent。计划写入 `TempScr/project-handoff-plan.md/.json`，快速检查文档、focus 和扫描范围后自动继续，不增加例行确认。
 
-AI 应快速检查计划摘要中的模式、文档清单和扫描范围，然后直接继续，不再把“形成哪些文档”的确认作为人工门禁。确实需要定制时，可在运行 `generate_handoff.py` 前编辑 plan 文件中的 action/focus；小项目可跳过非必需文档（`required` 为 true 的文档不得跳过，否则 verify 会失败）；大项目的特殊主题（合规、多租户等）记入对应文档的 focus，在 Step 7 写入相关章节。后续 `generate_handoff.py` 会自动读取该计划并尊重 skip 决策。
+更新或比对时再运行 `scripts/compare_handoff.py`（使用技能绝对路径），产出 `TempScr/project-handoff-update-plan.md/.json`。简要告知受影响内容后继续已授权工作。首次创建无需新旧比对。
 
-### Step 4 — 生成并审阅更新建议
+专题很简单时可在计划中 skip，并在对应基础文档写清内容；8 份基础文档保留。计划只提供机器证据，不能禁止有源码依据的语义更新。
 
-```bash
-python /absolute/path/to/project-handoff/scripts/compare_handoff.py
-```
+## 阶段 4：按需阅读与编写
 
-生成 `TempScr/project-handoff-update-plan.md` 和 `.json`。脚本负责报告字段、关键文件和文档缺失情况的客观比较，并输出自上次验收基线以来的 **git commit 列表与变更文件统计**（以基线记录的 commit hash 为范围），为 AI 语义判断提供素材。AI 必须结合旧文档与源码补充语义影响。先向用户简要展示建议，再继续修改。`preserve` 文档不重写，`review` 文档先判断，`update` 文档只改受影响章节。
+先读受影响旧文档、必要源码及变更文件。完整首次创建核对 `key_files_to_read`；增量更新优先阅读变化与受影响路径，必要时扩展。应能解释业务目的、实际部署、变量用途和适用的 AI 调用。
 
-### Step 5 — 阅读关键文件和旧文档（不可省略）
+填写前读 [fill-guide.md](fill-guide.md) 公共规则，再只加载本次涉及的指南：
 
-打开 `analysis-report.json`，其中 `key_files_to_read` 列出了你必须实际阅读的文件（如 Dockerfile、wrangler.toml、主入口、CI 配置、已有 README）。逐个用 Read 工具阅读。**没读过这些文件就开始写文档，等于编造。**
-
-**完成标准**：你必须能回答以下问题，否则不得进入 Step 6：
-- 这个项目的业务目的是什么（给谁用、解决什么问题）
-- 每个部署目标的真实命令和流程
-- 每个环境变量在源码里的实际用途
-- AI API 在哪些功能里被调用、用的什么模型
-
-同时记录你在本次执行过程中实际使用了哪些**工具**，后续写入 ARCHITECTURE.md 的开发工具章节：
-
-- **Skills**：你触发了哪些 skills（通过 `/skill-name` 或关键词自动触发）
-- **MCP Servers**：你调用了哪些 MCP server（如 deepwiki、context7 等）
-- **Agent 类型**：你委派了哪些子 agent（如 explore、executor 等）
-
-这些信息无法被脚本静态扫描，只有你自己知道。
-
-**验证方式**：在 Step 8 的 verify 中，文档里用反引号引用的源码文件路径必须真实存在，或在 `key_files_to_read` 清单中（兼容相对根写法差异）；引用不存在或编造的路径会被标记为 WARN。
-
-### Step 6 — 创建、补齐或重建骨架
+- 概览、使用、架构与模块：`references/writing-core.md`。
+- 环境、部署、资源、维护与故障：`references/writing-runtime.md`。
+- 测试、已知问题、API、数据库、AI、桌面：`references/writing-topics.md`。
+- 非默认受众或受众变化：`references/client-levels.md`。
+- 具体部署平台：`references/deployment-platforms.md` 中对应章节。
 
 ```bash
 python /absolute/path/to/project-handoff/scripts/generate_handoff.py --mode update --client-level developer
 ```
 
-模式：`create` 首次创建；`update` 只创建缺失文档并保留已有文档；`rebuild` 备份后重建所有生成文档；默认 `auto` 会根据是否存在旧文档选择 create/update。可选受众：`non-technical` / `developer` / `devops`。脚本会自动读取 `TempScr/project-handoff-plan.json`（若存在）并跳过其中 action=skip 的文档；`--ignore-plan` 可绕过。
+create 首次创建；update 只补缺失文档；rebuild 备份后重建。根据实际模式执行。生成器尊重计划的专题选择，导航与验收使用相同集合。AI 补齐新文档，并原地修改旧文档受影响章节。
 
-### Step 7 — 增量修改或补全 TODO（核心工作）
+旧版 modules/infrastructure/maintenance/runbook 先备份，再迁入对应文档，保留人工原文与链接。AI 根据证据整理迁入的历史内容，消除重复和冲突，不能用骨架覆盖人工说明。
 
-1. 读技能目录下的 `fill-guide.md`。
-2. 逐文件、逐 TODO 处理，以 handoff-plan 中该文档的 focus 为写作重点。每个 TODO 的注释里写了"从哪里取信息、写成什么样"。
-3. 写作标准：**具体命令优先于描述**。坏例子："配置环境变量"。好例子："在 Cloudflare Dashboard → Workers → Settings → Variables 中添加 `OPENAI_API_KEY`"。
-4. 信息不足时，使用当前 agent 环境提供的提问能力向用户确认（例如直接在对话中提问、调用可用的用户输入工具、或按平台约定发起澄清）；如果当前流程不能等待用户回答，就标记 `[需向交接人确认: ...]`。不要写特定平台才有的工具名。
+架构的 AI 工具链章节仍记录实际使用的 skills、MCP 和 agents；不能声称使用未运行的工具。
 
-更新模式下，按更新建议直接编辑旧文档的受影响章节；新增文档则补全全部 TODO。不得用重新生成的骨架整体替换旧人工内容。
-
-### Step 8 — 验收门禁
+## 阶段 5：检查与交付
 
 ```bash
 python /absolute/path/to/project-handoff/scripts/verify_handoff.py
 ```
 
-检查：残留 TODO、空章节、缺失的骨架核心章节（防删章节绕过）、占位文本、必需文档缺失、文档数量、密钥泄露（示例/掩码值降级为 WARN）、文件引用真实性、覆盖率。输出问题清单和待确认标记汇总。**有任何 FAIL 项就回到 Step 7 修复，循环直到通过。**
-通过后直接交付 `ProjectDoc/` 目录中的文档，不再生成 ZIP 包。
+检查实际文档集合、核心章节、TODO、密钥模式、本地文档链接、文件引用及事实覆盖。有错误则修复后复验。静态校验通过不等于业务测试全部完成；如实记录未执行项。通过后推进基线，直接交付 `ProjectDoc/`，不生成 ZIP。
 
-## 文档清单
+## 平衡版文档
 
-| 文件 | 内容 | 何时生成 |
-|---|---|---|
-| README.md | 项目是什么、给谁用、核心功能、技术栈、快速启动、速查卡（30 秒应急速览） | 总是 |
-| USAGE.md | 用户角色、入口、核心业务流程、输入输出、权限与常见问题 | 总是 |
-| ARCHITECTURE.md | 架构图(mermaid)、前后端分工、数据流、技术选型理由、monorepo 结构 | 总是 |
-| MODULES.md | 模块职责、入口、依赖、调用链、共享状态、扩展点 | 总是 |
-| ENVIRONMENT.md | 每个变量：用途/获取方式/必需性/泄露影响、高熵值警告 | 总是 |
-| DEPLOYMENT.md | 按平台分章节的完整部署命令与流程（Docker/CF/CI/CircleCI/K8s/Vercel/Netlify/VPS） | 总是 |
-| INFRASTRUCTURE.md | 域名/DNS/Cloudflare/SSL/第三方服务账号清单 | 总是 |
-| AI-SERVICES.md | 调用的 AI API、用途、模型、计费、限流、降级 | 检测到 AI SDK/API |
-| API.md | 接口清单、鉴权方式 | 检测到 API 路由 |
-| DATABASE.md | 数据模型、迁移、备份恢复 | 检测到数据库 |
-| DESKTOP.md | Electron/Tauri/WinUI 构建打包发布 | 检测到桌面端 |
-| REGRESSION-TEST.md | 自动化与人工回归范围、命令、结果、证据、测试缺口 | 总是 |
-| KNOWN-ISSUES.md | 已知问题、技术债、未完成功能 | 总是（主要靠问用户） |
-| MAINTENANCE.md | 依赖更新、监控查看、日志位置 | 总是 |
-| RUNBOOK.md | 回滚命令、故障→处置对照表 | 总是 |
+| 文件 | 职责 |
+|---|---|
+| readme.md | 项目概览、快速启动、速查卡、导航 |
+| usage.md | 角色、实际业务流程、输入输出、权限和使用问题 |
+| architecture.md | 系统架构、模块职责、目录、调用链、扩展点 |
+| environment.md | 环境变量及配置说明 |
+| deployment.md | 部署、CI/CD、域名、账号与托管资源 |
+| operations.md | 日常维护、日志、实际适用的故障与回滚 |
+| regression-test.md | 验证范围、状态、结果证据和缺口 |
+| known-issues.md | 已知问题、未完成事项、技术债 |
 
-## 配置文件
+`api.md`、`database.md`、`ai-services.md`、`desktop.md` 按实际需要独立；只改一个主题时不重写其他文档。
 
-可选的 `.handoff.yml` 可覆盖默认行为：
+## 命名与配置
 
-```yaml
-skip_dirs: ["testdata", "fixtures"]  # 追加到默认跳过目录
-max_files: 5000                       # 最大扫描文件数
-```
+文档小写，多词连字符。保留 `SKILL.md`、Python 下划线脚本名和 `ProjectDoc/`。旧大写名称备份后迁移，大小写同名冲突停止并报告。
 
-详见 `.handoff.yml.example`。
-
-## References
-
-- `fill-guide.md` — 每份文档的逐节填写标准与好/坏示例。Step 7 必读。
-- `references/client-levels.md` — 三种受众的详略差异。
-- `references/deployment-platforms.md` — 各平台部署文档要点。
-
-## Scripts
-
-- `scripts/discover_project.py` — 发现候选项目根目录和历史交接文档，供 AI 决策
-- `scripts/analyze_project.py` — 扫描，输出 analysis-report.json
-- `scripts/plan_handoff.py` — 生成交接计划（模式判定 + 文档清单 + focus + 范围），默认自动采用；需要定制时可手动编辑计划
-- `scripts/compare_handoff.py` — 比较新旧扫描报告并生成增量更新建议（含基线以来的 git 变更）
-- `scripts/generate_handoff.py` — 按 create/update/rebuild 模式生成或补齐骨架
-- `scripts/verify_handoff.py` — 质量门禁
-- `scripts/_handoff_common.py` — 脚本公共工具（UTF-8 控制台等）
+`.handoff.yml` 支持带注释的单行 skip_dirs/include_dirs 数组及正整数 max_files；无效配置报告位置。详见 `.handoff.yml.example`。

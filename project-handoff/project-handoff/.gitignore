@@ -1,9 +1,0 @@
-# Python bytecode and interpreter caches
-__pycache__/
-*.py[cod]
-
-# Agent/runtime state
-.omc/
-
-# Local test fixtures and temporary outputs
-TempFiles/

@@ -7,7 +7,9 @@ import shutil
 import sys
 from datetime import datetime
 
-from _handoff_common import force_utf8_console
+from _handoff_common import force_utf8_console, normalize_doc_names
+from _handoff_documents import BASE_DOCS, TOPIC_DOCS, LEGACY_DOCS, load_document_plan, selected_docs
+from _handoff_migration import combine, migrate_legacy_docs
 
 ROOT = Path.cwd()
 OUT = ROOT / "ProjectDoc"
@@ -16,17 +18,7 @@ DEFAULT_PLAN_PATH = ROOT / "TempScr" / "project-handoff-plan.json"
 
 
 def load_plan(plan_path: Path | None) -> dict:
-    """读取 handoff-plan（plan_handoff.py 产物），不存在时返回空计划。"""
-    path = plan_path or (DEFAULT_PLAN_PATH if DEFAULT_PLAN_PATH.exists() else None)
-    if path is None:
-        return {}
-    try:
-        plan = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        print(f"[WARN] 计划文件 {path} 解析失败，忽略该计划。")
-        return {}
-    print(f"已读取交接计划: {path}")
-    return plan
+    return load_document_plan(ROOT, plan_path)
 
 
 def todo(instruction: str) -> str:
@@ -59,42 +51,43 @@ def cross_ref(target: str, label: str) -> str:
 
 # ---------- documents ----------
 
-def doc_readme(r, level):
+def doc_readme(r, level, selected=None):
     fw = ", ".join(f"{f['name']} {f['version']}" for f in r["frameworks"]) or "未检测到"
     ui = ", ".join(f"{u['name']} ({u['package']}@{u['version']})" for u in r["ui_libraries"]) or "无"
     pm = ", ".join(r.get("package_manager", ["unknown"]))
     audience_note = "面向非技术读者：避免术语，每个步骤给出截图位置或精确点击路径。" if level == "non-technical" else ""
     # 导航表含条件文档，与 main() 的生成条件保持一致
     nav_rows = [
-        ["[ARCHITECTURE.md](./ARCHITECTURE.md)", "架构与技术选型"],
-        ["[USAGE.md](./USAGE.md)", "项目使用说明与业务流程"],
-        ["[MODULES.md](./MODULES.md)", "模块职责、入口与依赖"],
-        ["[REGRESSION-TEST.md](./REGRESSION-TEST.md)", "回归测试范围与验证记录"],
-        ["[ENVIRONMENT.md](./ENVIRONMENT.md)", "环境变量"],
-        ["[DEPLOYMENT.md](./DEPLOYMENT.md)", "部署"],
-        ["[INFRASTRUCTURE.md](./INFRASTRUCTURE.md)", "域名/账号/第三方服务"],
-        ["[KNOWN-ISSUES.md](./KNOWN-ISSUES.md)", "已知问题"],
-        ["[MAINTENANCE.md](./MAINTENANCE.md)", "日常维护"],
-        ["[RUNBOOK.md](./RUNBOOK.md)", "故障处置"],
+        ["[architecture.md](./architecture.md)", "架构与技术选型"],
+        ["[usage.md](./usage.md)", "项目使用说明与业务流程"],
+        ["[regression-test.md](./regression-test.md)", "回归测试范围与验证记录"],
+        ["[environment.md](./environment.md)", "环境变量"],
+        ["[deployment.md](./deployment.md)", "部署"],
+        ["[known-issues.md](./known-issues.md)", "已知问题"],
+        ["[operations.md](./operations.md)", "日常维护、日志、故障与回滚"],
     ]
     ai = r.get("ai_services", {})
     if ai.get("sdks") or ai.get("endpoints") or ai.get("model_names"):
-        nav_rows.append(["[AI-SERVICES.md](./AI-SERVICES.md)", "AI API 使用详情"])
+        nav_rows.append(["[ai-services.md](./ai-services.md)", "AI API 使用详情"])
     if r.get("api_routes"):
-        nav_rows.append(["[API.md](./API.md)", "接口清单"])
+        nav_rows.append(["[api.md](./api.md)", "接口清单"])
     if r.get("database", {}).get("clients") or r.get("database", {}).get("orm"):
-        nav_rows.append(["[DATABASE.md](./DATABASE.md)", "数据库"])
+        nav_rows.append(["[database.md](./database.md)", "数据库"])
     if r.get("desktop"):
-        nav_rows.append(["[DESKTOP.md](./DESKTOP.md)", "桌面端"])
+        nav_rows.append(["[desktop.md](./desktop.md)", "桌面端"])
+    if selected is not None:
+        nav_rows = [row for row in nav_rows if row[0].split('](./', 1)[1][:-1] in selected]
+        linked = {row[0].split('](./', 1)[1][:-1] for row in nav_rows}
+        nav_rows.extend([[f'[{name}](./{name})', '专题说明'] for name in sorted(selected - linked - {'readme.md'})])
     return "\n\n".join([
-        frontmatter("README.md", level),
+        frontmatter("readme.md", level),
         f"# {r['project_name']} — 项目交接文档",
         section("待确认问题",
                 todo("把本文档集内所有 `[需向交接人确认: ...]` 标记汇总到这里，每条一行；得到答复后同步更新对应正文并保留状态。没有时写'当前无待确认问题'。")),
         section("项目简介",
                 todo("用 2-4 句话说明：这个项目是什么、给谁用、解决什么问题。来源：已有 README、主页面源码、向用户提问。禁止只罗列技术栈。" + audience_note)),
         section("核心功能",
-                todo("列出 3-8 个核心功能点，每个一行。来源：阅读路由/页面结构 + 已有 README。格式：'- 功能名：一句话说明'")),
+                todo("按真实功能列出核心功能点，不设最少数量，每个一行。来源：阅读路由/页面结构 + 已有 README。格式：'- 功能名：一句话说明'")),
         section("技术栈",
                 f"**框架**: {fw}",
                 f"**UI 组件库**: {ui}",
@@ -109,9 +102,9 @@ def doc_readme(r, level):
                     ["本地访问地址", todo("端口和 URL，从启动配置/运行验证中获取"), "启动后实际访问入口"],
                     ["生产访问入口", todo("生产 URL 或运行位置；未知写 [需向交接人确认: 生产入口]"), "用户/部署平台"],
                     ["启动一行命令", todo("从快速启动中提炼最核心的一条命令"), "快速启动"],
-                    ["部署一行命令", todo("如 wrangler deploy / docker compose up -d / vercel --prod；详见 DEPLOYMENT.md"), "DEPLOYMENT.md"],
-                    ["回滚一行命令", todo("如 wrangler rollback / 重部署上一 tag；详见 RUNBOOK.md"), "RUNBOOK.md"],
-                    ["日志/监控入口", todo("看错误和用量的精确入口路径；详见 MAINTENANCE.md"), "MAINTENANCE.md"],
+                    ["部署一行命令", todo("如 wrangler deploy / docker compose up -d / vercel --prod；详见 deployment.md"), "deployment.md"],
+                    ["回滚一行命令", todo("如 wrangler rollback / 重部署上一 tag；详见 operations.md"), "operations.md"],
+                    ["日志/监控入口", todo("看错误和用量的精确入口路径；详见 operations.md"), "operations.md"],
                 ]),
                 todo("速查卡要求：出事时 30 秒能扫完。每格只放具体值（URL/端口/一行命令/人名），禁止长句和概念描述；细节放对应文档。")),
         section("文档导航",
@@ -220,12 +213,12 @@ def doc_architecture(r):
                                "格式：'- **skill 名称**: 用途' / '- **MCP server**: 用途' / '- **Agent 类型**: 用途'"))
 
     return "\n\n".join(filter(None, [
-        frontmatter("ARCHITECTURE.md", "developer"),
+        frontmatter("architecture.md", "developer"),
         "# 系统架构",
         section("架构总览",
                 "```mermaid\n" + todo("画出系统架构图：前端、后端、数据库、外部 AI API、部署平台之间的调用关系。依据 analysis-report 中的 frameworks/docker/cloudflare/ai_services/database") + "\n```",
                 todo("用一段话解释数据流向：用户请求从哪进来、经过什么、数据存到哪")),
-        section("目录结构", f"```\n{tree}\n```", todo("为上面树中 5-10 个关键目录各加一行用途说明")),
+        section("目录结构", f"```\n{tree}\n```", todo("为上面树中 实际存在的关键目录各加一行用途说明")),
         mono_text,
         native_text,
         wsl_text,
@@ -265,10 +258,10 @@ def doc_environment(r):
                                todo("确认这些变量的值是否为真实密钥，如果是则在交接后必须轮换"))
 
     return "\n\n".join(filter(None, [
-        frontmatter("ENVIRONMENT.md", "developer"),
+        frontmatter("environment.md", "developer"),
         "# 环境变量",
         "⚠️ 本文档不包含任何真实密钥值。真实值通过安全渠道单独交接。",
-        cross_ref("DEPLOYMENT.md", "密钥在各部署平台的配置位置"),
+        cross_ref("deployment.md", "密钥在各部署平台的配置位置"),
         section("变量清单", table(["变量名", "来源", "交接说明"], rows) if rows else "未检测到环境变量。"),
         unused,
         high_entropy,
@@ -277,7 +270,7 @@ def doc_environment(r):
 
 
 def doc_deployment(r, level):
-    parts = [frontmatter("DEPLOYMENT.md", level), "# 部署指南"]
+    parts = [frontmatter("deployment.md", level), "# 部署指南"]
     docker = r["docker"]
     if docker.get("dockerfile"):
         d = docker["dockerfile"]
@@ -353,19 +346,19 @@ def doc_deployment(r, level):
                              todo("说明 k8s 部署流程：kubectl apply 命令、namespace 创建、ConfigMap/Secret 配置、Ingress 域名绑定")))
 
     for desktop in r["desktop"]:
-        parts.append(section(f"桌面端 — {desktop['type']}", "详见 [DESKTOP.md](./DESKTOP.md)"))
+        parts.append(section(f"桌面端 — {desktop['type']}", "详见 [desktop.md](./desktop.md)"))
     if not any([docker, cf.get("wrangler"), ci.get("github_actions"), ci.get("gitlab_ci"),
                 ci.get("jenkins"), ci.get("circleci"), k8s.get("resources"),
                 targets.get("vercel"), targets.get("netlify"), targets.get("vps")]):
         parts.append(section("部署方式", todo("未检测到 Docker/CF/CI/K8s/Vercel/Netlify/VPS 配置。向用户询问当前的实际部署方式并记录完整步骤，或写 [需向交接人确认: 部署方式]")))
     parts.append(section("首次完整部署演练", todo("假设接手方拿到一个全新账号/服务器，按顺序列出从零到上线的 checklist（编号步骤，每步一条命令或一个精确的后台操作）" + ("。读者非技术人员，每步注明在哪个网页点什么。" if level == "non-technical" else ""))))
-    parts.append(cross_ref("ENVIRONMENT.md", "环境变量配置"))
+    parts.append(cross_ref("environment.md", "环境变量配置"))
     return "\n\n".join(parts)
 
 
 def doc_infrastructure(r):
     return "\n\n".join([
-        frontmatter("INFRASTRUCTURE.md", "developer"),
+        frontmatter("deployment.md", "developer"),
         "# 基础设施与账号",
         section("域名与 DNS", todo("列出所有域名、注册商、DNS 托管位置（是否在 Cloudflare）、SSL 证书来源。来源：wrangler routes、CI 配置、向用户提问")),
         section("第三方服务账号清单",
@@ -382,7 +375,7 @@ def doc_ai_services(r):
     ep_rows = [[f"`{e['value']}`", e["found_in"], todo("对应什么功能")] for e in ai["endpoints"]]
     models = ", ".join(f"`{m['value']}`" for m in ai["model_names"]) or "未检测到"
     return "\n\n".join([
-        frontmatter("AI-SERVICES.md", "developer"),
+        frontmatter("ai-services.md", "developer"),
         "# AI 服务",
         section("使用的 SDK", table(["SDK", "包", "用途"], sdk_rows) if sdk_rows else "未检测到 AI SDK。"),
         section("API 端点", table(["端点", "出现位置", "功能"], ep_rows) if ep_rows else "未检测到直连端点。"),
@@ -395,7 +388,7 @@ def doc_ai_services(r):
 def doc_api(r):
     routes = "\n".join(f"- `{route}`" for route in r["api_routes"])
     parts = [
-        frontmatter("API.md", "developer"),
+        frontmatter("api.md", "developer"),
         "# API 文档",
         section("接口清单（扫描所得）", routes or "未检测到",
                 todo("逐个补充：用途、请求/响应示例（读源码获取真实字段，禁止编造字段名）。数量太多时优先覆盖核心业务接口，其余归类说明")),
@@ -404,7 +397,7 @@ def doc_api(r):
         parts.append(section("OpenAPI / Swagger 规范",
                              "\n".join(f"- `{spec}`" for spec in r["api_specs"]),
                              todo("说明规范文件与实现的同步方式（手写/代码生成），访问入口（如 /docs 或 /swagger），字段定义以哪个为准")))
-    parts.append(section("鉴权", todo("说明 API 的鉴权方式（API key? JWT? session? 无鉴权?），读中间件/拦截器源码确认。如果发现无鉴权的敏感接口，在 KNOWN-ISSUES.md 中记录")))
+    parts.append(section("鉴权", todo("说明 API 的鉴权方式（API key? JWT? session? 无鉴权?），读中间件/拦截器源码确认。如果发现无鉴权的敏感接口，在 known-issues.md 中记录")))
     return "\n\n".join(parts)
 
 
@@ -414,7 +407,7 @@ def doc_database(r):
     if db.get("prisma_models"):
         models = "Prisma 模型: " + ", ".join(f"`{m}`" for m in db["prisma_models"])
     return "\n\n".join([
-        frontmatter("DATABASE.md", "developer"),
+        frontmatter("database.md", "developer"),
         "# 数据库",
         section("概况",
                 f"- 类型: {', '.join(db['clients']) or '未检测到客户端'}\n- ORM: {', '.join(db['orm']) or '无'}\n- 迁移目录: {', '.join(db['migrations']) or '无'}\n{models}",
@@ -426,7 +419,7 @@ def doc_database(r):
 
 
 def doc_desktop(r):
-    parts = [frontmatter("DESKTOP.md", "developer"), "# 桌面端"]
+    parts = [frontmatter("desktop.md", "developer"), "# 桌面端"]
     for desktop in r["desktop"]:
         parts.append(section(desktop["type"],
                              f"配置: {json.dumps(desktop, ensure_ascii=False)}",
@@ -437,7 +430,7 @@ def doc_desktop(r):
 
 def doc_known_issues():
     return "\n\n".join([
-        frontmatter("KNOWN-ISSUES.md", "developer"),
+        frontmatter("known-issues.md", "developer"),
         "# 已知问题与技术债",
         "> 这是交接中最有价值的文档。宁可多写，不可隐瞒。",
         section("已知 Bug", todo("向用户提问收集；同时检索源码中的 TODO/FIXME/HACK 注释并逐条核实记录（格式：现象 → 影响 → 临时绕过方法 → 相关文件）")),
@@ -450,7 +443,7 @@ def doc_known_issues():
 def doc_maintenance(r):
     monitoring = "\n".join(f"- {m['service']} (`{m['package']}`)" for m in r["monitoring"]) or "未检测到监控/日志组件。"
     return "\n\n".join([
-        frontmatter("MAINTENANCE.md", "developer"),
+        frontmatter("operations.md", "developer"),
         "# 日常维护",
         section("监控与日志", monitoring,
                 todo("说明：去哪看错误（Sentry 项目地址？CF Dashboard 的 Workers 日志？容器 docker logs？）、去哪看用量/账单，逐个给出入口路径")),
@@ -461,24 +454,24 @@ def doc_maintenance(r):
 
 def doc_runbook(level):
     return "\n\n".join([
-        frontmatter("RUNBOOK.md", level),
+        frontmatter("operations.md", level),
         "# 运维手册 (Runbook)",
         section("回滚", "```bash\n" + todo("按部署平台写出具体回滚命令：CF Workers 用 wrangler rollback / Dashboard 版本回退；Docker 用上一个 tag 重新部署；写真实命令不写概念") + "\n```"),
         section("常见故障处置",
                 table(["症状", "可能原因", "处置步骤"],
-                      [[todo("覆盖至少：服务完全不可用 / AI 功能报错 / 部署失败 / 数据库连不上，每条给可执行的排查命令"), "", ""]])),
+                      [[todo("只覆盖实际适用的故障；根据项目运行方式、部署目标和真实依赖选择场景，无 AI 或数据库时不添加相关故障。每条给有证据的排查命令"), "", ""]])),
         section("密钥失效处理", todo("逐个关键密钥说明：失效时的现象、去哪重新生成、更新到哪里（env? CF secret? GitHub secret?）")),
     ])
 
 
 def doc_usage(r, level):
     return "\n\n".join([
-        frontmatter("USAGE.md", level),
+        frontmatter("usage.md", level),
         "# 项目使用说明",
         section("适用角色与入口",
                 todo("说明谁使用本项目、每类角色从哪里进入（网址、桌面程序、CLI 或设备入口）、需要什么前置权限。入口必须来自源码、配置或实际运行验证。")),
         section("核心使用流程",
-                todo("按真实业务顺序写 2-6 条典型流程。每条包含：前置条件、操作步骤、输入、预期输出、失败表现。界面项目需依据真实浏览器/软件操作验证。")),
+                todo("按真实业务顺序写适用的典型流程，不设最少数量。每条包含：前置条件、操作步骤、输入、预期输出、失败表现。界面项目需依据真实浏览器/软件操作验证。")),
         section("启动与停止",
                 todo("分别写开发和生产环境的启动、访问、健康检查、停止命令；说明默认端口和进程关系。不得只引用 README。")),
         section("数据与文件",
@@ -493,19 +486,16 @@ def doc_usage(r, level):
 def doc_modules(r):
     tree = "\n".join(r.get("directory_tree", []))
     return "\n\n".join([
-        frontmatter("MODULES.md", "developer"),
+        frontmatter("architecture.md", "developer"),
         "# 模块说明",
         section("模块总览",
-                "```mermaid\n" + todo("画出核心模块依赖图，标明调用方向；不要重复 ARCHITECTURE 的部署架构图。") + "\n```",
+                "```mermaid\n" + todo("画出核心模块依赖图，标明调用方向；与本文件的系统架构图互补。") + "\n```",
                 todo("用一段话说明模块边界和主执行链路。")),
         section("模块职责矩阵",
                 table(["模块", "职责", "入口文件", "上游", "下游", "关键配置", "测试"],
                       [[todo("逐个列出核心业务模块，而不是逐文件罗列"), "", "", "", "", "", ""]])),
-        section("关键目录",
-                f"```\n{tree}\n```",
-                todo("从目录树中选择核心目录，说明其职责、所有权边界以及不能随意修改的约束。")),
         section("关键调用链",
-                todo("按真实源码描述 2-5 条关键调用链，格式：入口 -> 业务模块 -> 数据/外部服务 -> 输出，并给出文件路径。")),
+                todo("按真实源码描述实际存在的关键调用链，不设最少数量，格式：入口 -> 业务模块 -> 数据/外部服务 -> 输出，并给出文件路径。")),
         section("共享状态与数据边界",
                 todo("说明模块之间共享的数据库表、缓存、文件、消息、全局状态或硬件资源；指出并发和生命周期约束。")),
         section("扩展与替换点",
@@ -524,14 +514,14 @@ def doc_regression_test(r):
         f"- 测试文件数: {testing.get('test_file_count', 0)}"
     )
     return "\n\n".join([
-        frontmatter("REGRESSION-TEST.md", "developer"),
+        frontmatter("regression-test.md", "developer"),
         "# 回归测试说明",
         section("测试现状", evidence,
                 table(["命令", "实际命令", "来源", "覆盖范围"], script_rows) if script_rows else "未检测到 package test scripts。",
                 todo("阅读测试配置和测试代码，说明现有自动化测试真实覆盖了什么、没有覆盖什么。")),
         section("回归范围",
                 table(["业务流程/模块", "风险", "验证方式", "通过标准", "证据位置"],
-                      [[todo("覆盖 USAGE.md 的核心流程和 MODULES.md 的高风险模块"), "", "", "", ""]])),
+                      [[todo("覆盖 usage.md 的核心流程和 architecture.md 的高风险模块"), "", "", "", ""]])),
         section("自动化测试",
                 "```bash\n" + todo("列出已实际执行的单元、集成、端到端、构建或静态检查命令；每条写运行目录和必要环境。未执行的命令明确标注未执行。") + "\n```",
                 todo("记录执行日期、结果、失败项和日志/报告位置。禁止把仅发现的脚本写成已通过。")),
@@ -571,38 +561,27 @@ def main():
 
     OUT.mkdir(exist_ok=True)
 
-    docs = {
-        "README.md": doc_readme(r, args.client_level),
-        "USAGE.md": doc_usage(r, args.client_level),
-        "ARCHITECTURE.md": doc_architecture(r),
-        "MODULES.md": doc_modules(r),
-        "ENVIRONMENT.md": doc_environment(r),
-        "DEPLOYMENT.md": doc_deployment(r, args.client_level),
-        "INFRASTRUCTURE.md": doc_infrastructure(r),
-        "KNOWN-ISSUES.md": doc_known_issues(),
-        "MAINTENANCE.md": doc_maintenance(r),
-        "REGRESSION-TEST.md": doc_regression_test(r),
-        "RUNBOOK.md": doc_runbook(args.client_level),
+    plan = {} if args.ignore_plan else load_plan(Path(args.plan) if args.plan else None)
+    selected = selected_docs(r, plan)
+    factories = {
+        'readme.md': lambda: doc_readme(r, args.client_level, selected),
+        'usage.md': lambda: doc_usage(r, args.client_level),
+        'architecture.md': lambda: combine(doc_architecture(r), doc_modules(r)),
+        'environment.md': lambda: doc_environment(r),
+        'deployment.md': lambda: combine(doc_deployment(r, args.client_level), doc_infrastructure(r)),
+        'operations.md': lambda: combine(doc_maintenance(r), doc_runbook(args.client_level)),
+        'known-issues.md': doc_known_issues,
+        'regression-test.md': lambda: doc_regression_test(r),
+        'ai-services.md': lambda: doc_ai_services(r),
+        'api.md': lambda: doc_api(r),
+        'database.md': lambda: doc_database(r),
+        'desktop.md': lambda: doc_desktop(r),
     }
-    if r["ai_services"]["sdks"] or r["ai_services"]["endpoints"] or r["ai_services"]["model_names"]:
-        docs["AI-SERVICES.md"] = doc_ai_services(r)
-    if r["api_routes"]:
-        docs["API.md"] = doc_api(r)
-    if r["database"]["clients"] or r["database"]["orm"]:
-        docs["DATABASE.md"] = doc_database(r)
-    if r["desktop"]:
-        docs["DESKTOP.md"] = doc_desktop(r)
-
-    # 尊重 handoff-plan 的 skip 决策（计划默认由扫描事实生成，也可手动定制）
-    if not args.ignore_plan:
-        plan = load_plan(Path(args.plan) if args.plan else None)
-        skips = {d["name"] for d in plan.get("documents", []) if d.get("action") == "skip"}
-        for name in sorted(skips & set(docs)):
-            del docs[name]
-            print(f"  {name:22s} 按 handoff-plan 跳过")
-
-    generated_names = set(docs) | {"AI-SERVICES.md", "API.md", "DATABASE.md", "DESKTOP.md"}
-    existing_generated = {path.name for path in OUT.glob("*.md") if path.name in generated_names}
+    docs = {name: factories[name]() for name in factories if name in selected}
+    if 'desktop.md' not in selected:
+        docs['deployment.md'] = docs['deployment.md'].replace('详见 [desktop.md](./desktop.md)', todo('在本节说明桌面端打包与发布，专题按计划不独立生成'))
+    generated_names = set(BASE_DOCS) | TOPIC_DOCS | set(LEGACY_DOCS)
+    existing_generated = {path.name.lower() for path in OUT.glob("*.md") if path.name.lower() in generated_names}
     mode = args.mode
     if mode == "auto":
         mode = "update" if existing_generated else "create"
@@ -613,10 +592,11 @@ def main():
         backup.parent.mkdir(exist_ok=True)
         shutil.copytree(OUT, backup)
         print(f"  已备份旧文档到 {backup.relative_to(ROOT)}")
-        for name in generated_names:
-            path = OUT / name
-            if path.exists():
+        for path in OUT.glob("*.md"):
+            if path.name.lower() in generated_names:
                 path.unlink()
+
+    normalize_doc_names(OUT)
 
     written = 0
     preserved = 0
@@ -630,6 +610,16 @@ def main():
         written += 1
         todo_count = content.count("TODO(AI)")
         print(f"  {name:22s} {todo_count} 个 TODO 待填写")
+
+    migrate_legacy_docs(OUT)
+
+    state = OUT / '.handoff'
+    state.mkdir(exist_ok=True)
+    applied = {'project_root': str(ROOT.resolve()), 'documents': [
+        {'name': name, 'action': 'generate' if name in selected else 'skip'}
+        for name in sorted(set(BASE_DOCS) | TOPIC_DOCS)
+    ]}
+    (state / 'document-selection.json').write_text(json.dumps(applied, ensure_ascii=False, indent=2), encoding='utf-8')
 
     print(f"\n模式: {mode}; 新写入 {written} 份，保留 {preserved} 份。")
     if mode == "update":

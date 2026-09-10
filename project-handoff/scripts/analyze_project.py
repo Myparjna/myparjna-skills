@@ -10,8 +10,9 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 
-from _handoff_common import force_utf8_console
+from _handoff_common import force_utf8_console, read_handoff_config
 
 ROOT = Path.cwd()
 OUT_DIR = ROOT / "ProjectDoc"
@@ -33,9 +34,9 @@ GREP_EXT = {".js", ".jsx", ".ts", ".tsx", ".vue", ".svelte", ".py", ".html",
              ".go", ".rs", ".rb", ".java", ".kt", ".swift", ".cs", ".php",
              ".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx",
              ".ino", ".S", ".s", ".cmake", ".mk", ".gradle", ".properties",
-             ".xml", ".ld", ".lds"}
+             ".xml", ".ld", ".lds", ".sh", ".bash", ".zsh", ".ps1", ".bat", ".cmd"}
 GREP_FILENAMES = {
-    "Makefile", "makefile", "GNUmakefile", "CMakeLists.txt", "meson.build",
+    "Dockerfile", "Makefile", "makefile", "GNUmakefile", "CMakeLists.txt", "meson.build",
     "platformio.ini", "go.mod", "go.sum", "Cargo.toml", "Cargo.lock",
     "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
     "settings.gradle.kts", "requirements.txt", "pyproject.toml",
@@ -64,31 +65,13 @@ def _skip_dirs_lower():
 
 
 def load_config():
-    """加载 .handoff.yml 配置（可选）。"""
-    global SKIP_DIRS, MAX_GREP_FILES, INCLUDE_DIRS
-    config_path = ROOT / ".handoff.yml"
-    if not config_path.exists():
-        return
-    try:
-        # 简单 YAML 解析（不依赖 pyyaml）
-        content = config_path.read_text(encoding="utf-8")
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if ":" in line:
-                key, _, val = line.partition(":")
-                key = key.strip()
-                val = val.strip()
-                if key == "skip_dirs" and val.startswith("["):
-                    extra = [s.strip().strip("'\"") for s in val.strip("[]").split(",") if s.strip()]
-                    SKIP_DIRS = SKIP_DIRS | set(extra)
-                elif key == "include_dirs" and val.startswith("["):
-                    INCLUDE_DIRS = [s.strip().strip("'\"") for s in val.strip("[]").split(",") if s.strip()]
-                elif key == "max_files" and val.isdigit():
-                    MAX_GREP_FILES = int(val)
-    except Exception:
-        pass  # 配置解析失败用默认值
+    global SKIP_DIRS, MAX_GREP_FILES, INCLUDE_DIRS, _SKIP_LOWER_CACHE
+    config = read_handoff_config(ROOT)
+    SKIP_DIRS = SKIP_DIRS | set(config['skip_dirs'])
+    INCLUDE_DIRS = config['include_dirs']
+    if config['max_files'] is not None:
+        MAX_GREP_FILES = config['max_files']
+    _SKIP_LOWER_CACHE = None
 
 
 def read_text(path: Path) -> str:
@@ -157,6 +140,8 @@ def rel_path(path: Path) -> str:
 
 
 def iter_files():
+    global ITERATION_TRUNCATED
+    ITERATION_TRUNCATED = False
     stack = list(scan_roots())
     count = 0
     while stack:
@@ -174,6 +159,7 @@ def iter_files():
             elif path.is_file():
                 count += 1
                 if count > MAX_GREP_FILES * 3:
+                    ITERATION_TRUNCATED = True
                     if sys.stderr.isatty():
                         sys.stderr.write(f"\n[warn] 扫描截断：已扫描 {count} 文件，部分文件未覆盖\n")
                     return
@@ -190,7 +176,7 @@ def collect_source_texts():
     for path in iter_files():
         if path.suffix.lower() in GREP_EXT or path.name in GREP_FILENAMES:
             matched.append(path)
-    truncated = len(matched) > MAX_GREP_FILES
+    truncated = ITERATION_TRUNCATED or len(matched) > MAX_GREP_FILES
     if truncated:
         if sys.stderr.isatty():
             sys.stderr.write(f"\n[warn] 候选文本文件 {len(matched)} 个超过上限 {MAX_GREP_FILES}，已优先保留配置/manifest 文件\n")
@@ -281,10 +267,30 @@ def load_python_deps(req_paths, pyproject_paths):
                 if name:
                     deps[name] = {"spec": line, "manifest": rel_path(path)}
     for path in pyproject_paths:
-        content = read_text(path)
-        for match in re.finditer(r'^\s*"?([A-Za-z0-9_.-]+)\s*[=<>!~"]', content, re.MULTILINE):
-            pass  # pyproject parsing kept minimal; requirements cover most cases
-        deps.setdefault("__pyproject__", {"spec": "see file", "manifest": rel_path(path)})
+        try:
+            data = tomllib.loads(read_text(path))
+        except tomllib.TOMLDecodeError as exc:
+            raise SystemExit(f'ERROR: 无法解析 {rel_path(path)}: {exc}') from exc
+        project = data.get('project', {})
+        groups = [project.get('dependencies', [])]
+        groups.extend(project.get('optional-dependencies', {}).values())
+        groups.extend(data.get('dependency-groups', {}).values())
+        for group in groups:
+            for spec in group:
+                if not isinstance(spec, str):
+                    continue  # include-group references are covered by scanning all groups.
+                match = re.match(r'([A-Za-z0-9][A-Za-z0-9_.-]*)', spec.strip())
+                if match:
+                    name = re.sub(r'[-_.]+', '-', match.group(1)).lower()
+                    deps[name] = {'spec': spec, 'manifest': rel_path(path)}
+        poetry = data.get('tool', {}).get('poetry', {})
+        poetry_groups = [poetry.get('dependencies', {}), poetry.get('dev-dependencies', {})]
+        poetry_groups.extend(group.get('dependencies', {}) for group in poetry.get('group', {}).values())
+        for group in poetry_groups:
+            for name, spec in group.items():
+                if name.lower() != 'python':
+                    deps.setdefault(re.sub(r'[-_.]+', '-', name).lower(),
+                                    {'spec': f'{name} {spec}', 'manifest': rel_path(path)})
     return deps
 
 
@@ -739,6 +745,13 @@ def detect_env_vars(texts):
             for pattern in shell_patterns:
                 for name in re.findall(pattern, content):
                     note_usage(name, rel)
+    for rel, content in texts:
+        if rel.lower().endswith('.ps1'):
+            for name in re.findall(r'(?i)\$env:([A-Z_][A-Z0-9_]*)|\$\{env:([A-Z_][A-Z0-9_]*)\}', content):
+                note_usage(next(value for value in name if value), rel)
+        if rel.lower().endswith(('.bat', '.cmd')):
+            for name in re.findall(r'%([A-Za-z_][A-Za-z0-9_]*)%|!([A-Za-z_][A-Za-z0-9_]*)!', content):
+                note_usage(next(value for value in name if value), rel)
     declared_keys = set(declared)
     return {
         "declared": [{"name": k, **v} for k, v in sorted(declared.items())],
@@ -1415,6 +1428,11 @@ def main() -> None:
     }
     report["key_files_to_read"] = build_key_files(report)
     report["key_file_fingerprints"] = fingerprint_key_files(report["key_files_to_read"])
+    report["source_file_fingerprints"] = {
+        rel: {"sha256": hashlib.sha256(content.encode('utf-8')).hexdigest()}
+        for rel, content in texts
+    }
+    report["source_fingerprints_complete"] = not truncated
 
     report_str = json.dumps(report, indent=2, ensure_ascii=False)
 

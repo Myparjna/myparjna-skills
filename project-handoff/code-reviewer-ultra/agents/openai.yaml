@@ -1,7 +1,0 @@
-interface:
-  display_name: "Code Reviewer Ultra"
-  short_description: "Evidence-backed review with scope, security, and tests"
-  default_prompt: "Use $code-reviewer-ultra to review this change with file-line evidence, severity, confidence, and a clear verdict."
-
-policy:
-  allow_implicit_invocation: true

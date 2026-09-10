@@ -6,34 +6,13 @@ import re
 import sys
 
 from _handoff_common import force_utf8_console
+from _handoff_documents import BASE_DOCS, REQUIRED_SECTIONS, applied_docs
 
 ROOT = Path.cwd()
 OUT = ROOT / "ProjectDoc"
 REPORT_PATH = OUT / "analysis-report.json"
 
-# 必需文档列表
-REQUIRED_DOCS = {"README.md", "USAGE.md", "ARCHITECTURE.md", "MODULES.md",
-                 "ENVIRONMENT.md", "DEPLOYMENT.md", "REGRESSION-TEST.md"}
-MIN_DOC_COUNT = 9
-
-# 每份生成文档必须保留的核心章节（骨架基线），防止删除章节绕过 TODO 检查
-REQUIRED_SECTIONS = {
-    "README.md": ["待确认问题", "项目简介", "核心功能", "技术栈", "快速启动", "速查卡", "文档导航"],
-    "USAGE.md": ["适用角色与入口", "核心使用流程", "启动与停止"],
-    "ARCHITECTURE.md": ["架构总览", "目录结构", "技术选型与路线"],
-    "MODULES.md": ["模块总览", "模块职责矩阵", "关键调用链"],
-    "ENVIRONMENT.md": ["变量清单", "密钥轮换"],
-    "DEPLOYMENT.md": ["首次完整部署演练"],
-    "INFRASTRUCTURE.md": ["域名与 DNS", "第三方服务账号清单"],
-    "REGRESSION-TEST.md": ["测试现状", "回归范围", "发布前最小回归清单", "已知测试缺口"],
-    "KNOWN-ISSUES.md": ["已知 Bug", "技术债"],
-    "MAINTENANCE.md": ["监控与日志", "例行检查清单"],
-    "RUNBOOK.md": ["回滚", "常见故障处置"],
-    "AI-SERVICES.md": ["使用的 SDK", "计费与限额"],
-    "API.md": ["接口清单（扫描所得）", "鉴权"],
-    "DATABASE.md": ["概况", "数据模型", "备份与恢复"],
-    "DESKTOP.md": [],
-}
+REQUIRED_DOCS = set(BASE_DOCS)
 
 # 真实密钥特征（高置信度模式，避免误报变量名）
 SECRET_PATTERNS = [
@@ -97,7 +76,7 @@ def _is_placeholder(match_text, context):
     """判断密钥模式命中的内容是否为示例值/掩码而非真实密钥。"""
     if _PLACEHOLDER_HINT.search(match_text):
         return True
-    return bool(_PLACEHOLDER_HINT.search(context))
+    return False
 
 
 def load_report():
@@ -170,18 +149,28 @@ def check_doc(path: Path, report):
         ln = text[:m.start()].count("\n") + 1
         issues.append(("WARN", f"L{ln}: 引用的文件不存在: `{ref}`（确认是否编造）"))
 
+    # Validate local Markdown links relative to their document (ignore fenced examples).
+    from urllib.parse import unquote, urlsplit
+    link_text = re.sub(r'```.*?```|~~~.*?~~~', '', text, flags=re.S)
+    destinations = re.findall(r'\]\(<?([^\s)>]+)', link_text)
+    destinations += re.findall(r'^\s*\[[^]\n]+\]:\s*<?([^\s>]+)', link_text, re.M)
+    for destination in destinations:
+        parsed = urlsplit(destination)
+        if parsed.scheme or parsed.netloc or not parsed.path:
+            continue
+        target = path.parent / unquote(parsed.path)
+        if target.suffix.lower() == '.md' and not target.exists():
+            issues.append(('ERROR', f'本地文档链接不存在: {destination}'))
     return issues, text
 
 
-def check_doc_count(docs):
+def check_doc_count(docs, required_docs=None):
     """检查文档数量和必需文档。"""
     issues = []
-    doc_names = {p.name for p in docs}
+    doc_names = {p.name.lower() for p in docs}
 
-    if len(docs) < MIN_DOC_COUNT:
-        issues.append(("ERROR", f"文档数量不足：只有 {len(docs)} 份，最少需要 {MIN_DOC_COUNT} 份"))
 
-    for required in REQUIRED_DOCS:
+    for required in (REQUIRED_DOCS if required_docs is None else required_docs):
         if required not in doc_names:
             issues.append(("ERROR", f"缺少必需文档: {required}"))
 
@@ -192,7 +181,7 @@ def check_required_sections(docs):
     """每份文档必须保留骨架核心章节，防止删除章节绕过 TODO 检查。"""
     issues = []
     for path in docs:
-        required = REQUIRED_SECTIONS.get(path.name)
+        required = REQUIRED_SECTIONS.get(path.name.lower())
         if required is None:
             continue
         text = path.read_text(encoding="utf-8")
@@ -205,21 +194,8 @@ def check_required_sections(docs):
 def check_residual_docs(docs, report):
     """检查是否有上次运行残留的多余文档。"""
     issues = []
-    # 生成器应该产出的文档列表
-    expected = {"README.md", "USAGE.md", "ARCHITECTURE.md", "MODULES.md",
-                "ENVIRONMENT.md", "DEPLOYMENT.md", "INFRASTRUCTURE.md",
-                "REGRESSION-TEST.md", "KNOWN-ISSUES.md", "MAINTENANCE.md", "RUNBOOK.md"}
-    ai = report.get("ai_services", {})
-    if ai.get("sdks") or ai.get("endpoints") or ai.get("model_names"):
-        expected.add("AI-SERVICES.md")
-    if report.get("api_routes"):
-        expected.add("API.md")
-    if report.get("database", {}).get("clients") or report.get("database", {}).get("orm"):
-        expected.add("DATABASE.md")
-    if report.get("desktop"):
-        expected.add("DESKTOP.md")
-
-    actual = {p.name for p in docs}
+    expected = applied_docs(ROOT, report)
+    actual = {p.name.lower() for p in docs}
     residual = actual - expected - {"analysis-report.json"}
     if residual:
         issues.append(("WARN", f"发现可能的残留文档: {', '.join(residual)}（上次运行遗留？）"))
@@ -255,7 +231,7 @@ def check_coverage(report, all_text):
     for script in report.get("testing", {}).get("test_scripts", []):
         name = script.get("name", "")
         if name and not re.search(r"\b" + re.escape(name) + r"\b", all_text):
-            issues.append(("WARN", f"测试脚本 `{name}` 未在 REGRESSION-TEST.md 中说明"))
+            issues.append(("WARN", f"测试脚本 `{name}` 未在 regression-test.md 中说明"))
     return issues
 
 
@@ -308,7 +284,7 @@ def main():
         print("    [OK] 扫描完整")
 
     print("\n— 文档结构检查 —")
-    struct_issues = check_doc_count(docs)
+    struct_issues = check_doc_count(docs, applied_docs(ROOT, report))
     struct_issues += check_required_sections(docs)
     for sev, msg in struct_issues:
         total[sev] += 1

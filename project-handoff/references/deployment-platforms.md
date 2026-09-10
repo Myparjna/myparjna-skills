@@ -1,6 +1,6 @@
 # 部署平台文档要点
 
-本指南列出各部署平台在 DEPLOYMENT.md 中必须覆盖的要点。根据 analysis-report.json 中检测到的部署目标选择对应章节。
+本指南列出各部署平台在 deployment.md 中必须覆盖的要点。根据 analysis-report.json 中检测到的部署目标选择对应章节。
 
 ## Docker
 

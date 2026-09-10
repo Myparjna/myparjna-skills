@@ -14,7 +14,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from _handoff_common import force_utf8_console
+from _handoff_common import force_utf8_console, read_handoff_config
+from _handoff_documents import BASE_DOCS, TOPIC_DOCS, LEGACY_DOCS, conditional_docs
 
 ROOT = Path.cwd()
 DOC_DIR = ROOT / "ProjectDoc"
@@ -22,33 +23,23 @@ REPORT_PATH = DOC_DIR / "analysis-report.json"
 CONFIG_PATH = ROOT / ".handoff.yml"
 
 # 门禁强制要求的文档（verify_handoff.py REQUIRED_DOCS），计划中不得跳过
-MANDATORY = {"README.md", "USAGE.md", "ARCHITECTURE.md", "MODULES.md",
-             "ENVIRONMENT.md", "DEPLOYMENT.md", "REGRESSION-TEST.md"}
+MANDATORY = set(BASE_DOCS)
 
 # 每份文档的一句话 focus（写进计划，供 AI 填写时聚焦）
 FOCUS = {
-    "README.md": "30 秒看懂项目 + 快速启动 + 速查卡；待确认问题全部汇总到顶部",
-    "USAGE.md": "从真实用户角色出发的核心业务流程，启动不等于使用",
-    "ARCHITECTURE.md": "mermaid 架构图、数据流、技术选型理由、AI 工具链痕迹",
-    "MODULES.md": "按业务职责划分模块，至少两条真实调用链并引用源码路径",
-    "ENVIRONMENT.md": "每个变量的用途/获取方式/必需性/泄露影响，不遗漏、不写真实值",
-    "DEPLOYMENT.md": "按检测到的平台分章节写完整可复制的部署命令",
-    "INFRASTRUCTURE.md": "域名/DNS/SSL/第三方账号清单与交接动作",
-    "AI-SERVICES.md": "AI API 的调用点、模型、计费限额与降级行为",
-    "API.md": "接口清单以扫描为准，鉴权方式读源码确认",
-    "DATABASE.md": "数据模型、迁移流程、备份恢复命令",
-    "DESKTOP.md": "构建打包命令、代码签名与自动更新现状",
-    "REGRESSION-TEST.md": "区分检测到/已执行/已通过，写清测试缺口",
-    "KNOWN-ISSUES.md": "宁可多写不可隐瞒：Bug、半成品功能、技术债",
-    "MAINTENANCE.md": "看日志/看账单/查漏洞的精确入口",
-    "RUNBOOK.md": "回滚命令、故障→处置对照表",
+    "readme.md": "30 秒看懂项目 + 快速启动 + 速查卡；待确认问题全部汇总到顶部",
+    "usage.md": "从真实用户角色出发的核心业务流程，启动不等于使用",
+    "architecture.md": "系统架构、模块职责、数据流、真实调用链、技术选型与扩展点",
+    "environment.md": "每个变量的用途/获取方式/必需性/泄露影响，不遗漏、不写真实值",
+    "deployment.md": "部署命令、域名/DNS、资源与账号归属、CI/CD",
+    "ai-services.md": "AI API 的调用点、模型、计费限额与降级行为",
+    "api.md": "接口清单以扫描为准，鉴权方式读源码确认",
+    "database.md": "数据模型、迁移流程、备份恢复命令",
+    "desktop.md": "构建打包命令、代码签名与自动更新现状",
+    "regression-test.md": "区分检测到/已执行/已通过，写清测试缺口",
+    "known-issues.md": "宁可多写不可隐瞒：Bug、半成品功能、技术债",
+    "operations.md": "日常维护、监控日志、适用的故障处置与回滚",
 }
-
-# 总是生成的基础文档
-BASE_DOCS = ["README.md", "USAGE.md", "ARCHITECTURE.md", "MODULES.md", "ENVIRONMENT.md",
-             "DEPLOYMENT.md", "INFRASTRUCTURE.md", "REGRESSION-TEST.md", "KNOWN-ISSUES.md",
-             "MAINTENANCE.md", "RUNBOOK.md"]
-
 
 def load_report() -> dict:
     if not REPORT_PATH.exists():
@@ -57,30 +48,12 @@ def load_report() -> dict:
 
 
 def read_config() -> dict:
-    """读 .handoff.yml 中用户已配置的扫描范围（与 analyze_project.py 同样的简单解析）。"""
-    cfg = {"skip_dirs": [], "max_files": None}
-    if not CONFIG_PATH.exists():
-        return cfg
-    try:
-        for line in CONFIG_PATH.read_text(encoding="utf-8").splitlines():
-            line = line.split("#", 1)[0].strip()
-            if not line or ":" not in line:
-                continue
-            key, _, val = line.partition(":")
-            key, val = key.strip(), val.strip()
-            if key == "skip_dirs" and val.startswith("["):
-                cfg["skip_dirs"] = [s.strip().strip("'\"") for s in val.strip("[]").split(",") if s.strip()]
-            elif key == "max_files" and val.isdigit():
-                cfg["max_files"] = int(val)
-    except OSError:
-        pass
-    return cfg
-
+    return read_handoff_config(ROOT)
 
 def detect_mode(report: dict, intent: str) -> tuple[str, str]:
     """判定 create/update/rebuild，返回 (mode, reason)。"""
-    generated_names = set(BASE_DOCS) | {"AI-SERVICES.md", "API.md", "DATABASE.md", "DESKTOP.md"}
-    existing = sorted(p.name for p in DOC_DIR.glob("*.md") if p.name in generated_names)
+    generated_names = set(BASE_DOCS) | TOPIC_DOCS | set(LEGACY_DOCS)
+    existing = sorted(p.name for p in DOC_DIR.glob("*.md") if p.name.lower() in generated_names)
     if intent != "auto":
         reason = f"用户通过 --intent {intent} 显式指定"
         if intent == "create" and existing:
@@ -90,24 +63,6 @@ def detect_mode(report: dict, intent: str) -> tuple[str, str]:
     if existing:
         return "update", f"检测到 {len(existing)} 份已有交接文档，默认增量更新"
     return "create", "未检测到已有交接文档，首次创建"
-
-
-def conditional_docs(report: dict) -> list[tuple[str, bool, str]]:
-    """条件文档及其检测证据，返回 (name, detected, evidence)。"""
-    ai = report.get("ai_services", {})
-    ai_hit = bool(ai.get("sdks") or ai.get("endpoints") or ai.get("model_names"))
-    ai_evi = ", ".join(s["package"] for s in ai.get("sdks", [])[:3]) or \
-        ", ".join(e["value"] for e in ai.get("endpoints", [])[:2]) or "模型名出现"
-    db = report.get("database", {})
-    db_hit = bool(db.get("clients") or db.get("orm"))
-    db_evi = ", ".join(db.get("clients", []) + db.get("orm", []))
-    return [
-        ("AI-SERVICES.md", ai_hit, ai_evi),
-        ("API.md", bool(report.get("api_routes")), f"{len(report.get('api_routes', []))} 条 API 路由"),
-        ("DATABASE.md", db_hit, db_evi),
-        ("DESKTOP.md", bool(report.get("desktop")),
-         ", ".join(d["type"] for d in report.get("desktop", []))),
-    ]
 
 
 def build_plan(report: dict, intent: str, client_level: str) -> dict:
@@ -227,7 +182,7 @@ def main() -> None:
     print(f"Handoff plan written to {md_path}")
     print(f"- 模式: {plan['mode']}（{plan['mode_reason']}）")
     print(f"- 文档: 生成 {generate_count} 份，跳过 {skip_count} 份")
-    print("下一步: 直接运行 generate_handoff.py；计划默认自动采用（如需定制，可先编辑 plan 文件）。")
+    print("下一步: 更新模式先运行 compare_handoff.py，再阅读受影响源码；创建模式直接阅读必要源码后生成。")
 
 
 if __name__ == "__main__":

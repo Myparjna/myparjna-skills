@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from _handoff_common import force_utf8_console
+from _handoff_documents import selected_docs, load_document_plan, LEGACY_DOCS
 
 ROOT = Path.cwd()
 DOC_DIR = ROOT / "ProjectDoc"
@@ -18,22 +19,26 @@ PREVIOUS_REPORT = DOC_DIR / ".handoff" / "analysis-report.previous.json"
 VERIFIED_REPORT = DOC_DIR / ".handoff" / "analysis-report.verified.json"
 
 DOC_FIELDS = {
-    "README.md": {"project_name", "package_manager", "frameworks", "ui_libraries", "npm_scripts", "git"},
-    "USAGE.md": {"frameworks", "api_routes", "desktop", "npm_scripts", "lan_startup", "frontend_mock"},
-    "ARCHITECTURE.md": {"frameworks", "monorepo", "database", "external_resources", "directory_tree", "native_embedded_ai"},
-    "MODULES.md": {"frameworks", "directory_tree", "api_routes", "database", "native_embedded_ai"},
-    "ENVIRONMENT.md": {"environment_variables"},
-    "DEPLOYMENT.md": {"docker", "cloudflare", "ci_cd", "kubernetes", "deployment_targets", "desktop"},
-    "INFRASTRUCTURE.md": {"cloudflare", "external_resources", "monitoring", "git"},
-    "AI-SERVICES.md": {"ai_services", "external_resources", "native_embedded_ai"},
-    "API.md": {"api_routes", "api_specs"},
-    "DATABASE.md": {"database"},
-    "DESKTOP.md": {"desktop"},
-    "REGRESSION-TEST.md": {"testing", "npm_scripts", "frameworks", "desktop"},
-    "KNOWN-ISSUES.md": {"testing", "scan_completeness"},
-    "MAINTENANCE.md": {"monitoring", "package_manager", "dependency_counts", "git"},
-    "RUNBOOK.md": {"docker", "cloudflare", "database", "ai_services", "monitoring"},
+    "readme.md": {"project_name", "package_manager", "frameworks", "ui_libraries", "npm_scripts", "git"},
+    "usage.md": {"frameworks", "api_routes", "desktop", "npm_scripts", "lan_startup", "frontend_mock"},
+    "architecture.md": {"frameworks", "monorepo", "database", "external_resources", "directory_tree", "native_embedded_ai"},
+    "modules.md": {"frameworks", "directory_tree", "api_routes", "database", "native_embedded_ai"},
+    "environment.md": {"environment_variables"},
+    "deployment.md": {"docker", "cloudflare", "ci_cd", "kubernetes", "deployment_targets", "desktop"},
+    "infrastructure.md": {"cloudflare", "external_resources", "monitoring", "git"},
+    "ai-services.md": {"ai_services", "external_resources", "native_embedded_ai"},
+    "api.md": {"api_routes", "api_specs"},
+    "database.md": {"database"},
+    "desktop.md": {"desktop"},
+    "regression-test.md": {"testing", "npm_scripts", "frameworks", "desktop"},
+    "known-issues.md": {"testing", "scan_completeness"},
+    "maintenance.md": {"monitoring", "package_manager", "dependency_counts", "git"},
+    "runbook.md": {"docker", "cloudflare", "database", "ai_services", "monitoring"},
 }
+
+
+for legacy, target in LEGACY_DOCS.items():
+    DOC_FIELDS.setdefault(target, set()).update(DOC_FIELDS.pop(legacy, set()))
 
 
 def load_json(path: Path) -> dict:
@@ -46,27 +51,12 @@ def load_json(path: Path) -> dict:
 
 
 def expected_docs(report: dict) -> set[str]:
-    docs = {
-        "README.md", "USAGE.md", "ARCHITECTURE.md", "MODULES.md", "ENVIRONMENT.md",
-        "DEPLOYMENT.md", "INFRASTRUCTURE.md", "REGRESSION-TEST.md", "KNOWN-ISSUES.md",
-        "MAINTENANCE.md", "RUNBOOK.md",
-    }
-    ai = report.get("ai_services", {})
-    if ai.get("sdks") or ai.get("endpoints") or ai.get("model_names"):
-        docs.add("AI-SERVICES.md")
-    if report.get("api_routes"):
-        docs.add("API.md")
-    database = report.get("database", {})
-    if database.get("clients") or database.get("orm"):
-        docs.add("DATABASE.md")
-    if report.get("desktop"):
-        docs.add("DESKTOP.md")
-    return docs
+    return selected_docs(report, load_document_plan(ROOT))
 
 
 def fingerprint_changes(previous: dict, current: dict) -> dict:
-    old = previous.get("key_file_fingerprints", {})
-    new = current.get("key_file_fingerprints", {})
+    old = {**previous.get("key_file_fingerprints", {}), **previous.get("source_file_fingerprints", {})}
+    new = {**current.get("key_file_fingerprints", {}), **current.get("source_file_fingerprints", {})}
     old_names, new_names = set(old), set(new)
     return {
         "added": sorted(new_names - old_names),
@@ -116,16 +106,22 @@ def git_changes_since_baseline(previous: dict) -> dict:
         result["diff_summary"] = run_git(["diff", "--shortstat", result["range"]])
         changed = [line for line in run_git(["diff", "--name-only", result["range"]]).splitlines() if line.strip()]
         result["changed_files"] = changed[:100]
+    dirty_files = set(run_git(['diff', '--name-only', 'HEAD']).splitlines()) | set(run_git(['ls-files', '--others', '--exclude-standard']).splitlines())
+    dirty_files = {name for name in dirty_files if not name.startswith(('ProjectDoc/', 'TempScr/', 'TempFiles/'))}
+    result['changed_files'] = sorted(set(result['changed_files']) | dirty_files)
     result["uncommitted_count"] = len([line for line in run_git(["status", "--porcelain"]).splitlines() if line.strip()])
     return result
 
 
-def make_plan(previous: dict, current: dict) -> dict:
+def make_plan(previous: dict, current: dict, git_changes=None) -> dict:
     changed_fields = sorted(field for field in set(previous) | set(current)
-                            if field not in {"generated_at", "tool_version", "key_file_fingerprints"}
+                            if field not in {"generated_at", "tool_version", "key_file_fingerprints", "source_file_fingerprints", "source_fingerprints_complete"}
                             and previous.get(field) != current.get(field))
     file_changes = fingerprint_changes(previous, current)
-    current_docs = {path.name for path in DOC_DIR.glob("*.md")}
+    current_docs = {path.name.lower() for path in DOC_DIR.glob("*.md")}
+    git_changes = git_changes or {}
+    incomplete = not previous.get('source_fingerprints_complete') or not current.get('source_fingerprints_complete')
+    needs_review = any(file_changes.values()) or bool(git_changes.get('changed_files') or git_changes.get('uncommitted_count')) or incomplete
     recommendations = []
     for doc in sorted(expected_docs(current)):
         relevant = sorted(DOC_FIELDS.get(doc, set()) & set(changed_fields))
@@ -135,9 +131,9 @@ def make_plan(previous: dict, current: dict) -> dict:
         elif relevant:
             action = "update"
             reason = "相关扫描事实发生变化"
-        elif any(file_changes.values()) and doc in {"README.md", "USAGE.md", "ARCHITECTURE.md", "MODULES.md", "REGRESSION-TEST.md", "KNOWN-ISSUES.md"}:
+        elif needs_review:
             action = "review"
-            reason = "关键文件发生变化，需要 AI 判断是否影响本文档"
+            reason = "源码/Git 发生变化或扫描证据不完整，需要 AI 判断是否影响本文档"
         else:
             action = "preserve"
             reason = "未发现直接相关的扫描事实变化，保留旧内容"
@@ -157,7 +153,7 @@ def make_plan(previous: dict, current: dict) -> dict:
         "recommendations": recommendations,
         "ai_instructions": [
             "先阅读旧文档和 changed key files，再补充语义层面的影响说明。",
-            "只原地修改 action=create/update/review 的文档；action=preserve 的文档不得重写。",
+            "默认只修改 create/update/review；preserve 表示机器未发现影响，实际源码证据可推翻，须说明原因。",
             "人工补充、历史决策和运维经验默认保留；只有新证据明确推翻时才修改。",
             "完成后运行 verify_handoff.py，不得把本计划当作已完成的更新。",
         ],
@@ -213,8 +209,9 @@ def main() -> None:
     previous = load_json(PREVIOUS_REPORT)
     # git 范围优先以最近一次验收通过的 verified 基线为准，其次才是 previous
     git_baseline = load_json(VERIFIED_REPORT) or previous
-    plan = make_plan(previous, current)
-    plan["git_changes"] = git_changes_since_baseline(git_baseline)
+    git_changes = git_changes_since_baseline(git_baseline)
+    plan = make_plan(previous, current, git_changes)
+    plan["git_changes"] = git_changes
     output_dir = (ROOT / args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / "project-handoff-update-plan.json"

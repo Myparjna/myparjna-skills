@@ -1,4 +1,0 @@
-interface:
-  display_name: "Code Simplifier Ultra"
-  short_description: "Evidence-driven code simplification and behavior-preserving review"
-  default_prompt: "Use $code-simplifier-ultra to simplify and review this code with minimal diffs and verification evidence."
