@@ -1,6 +1,6 @@
 # Testing Review Guide
 
-Review tests as evidence of behavior, not as a line-count target. Missing tests alone are a verification limitation, not an independent bug. Remain read-only by default: test additions below are recommendations unless review-and-fix is explicitly authorized.
+Review tests as evidence of behavior, not as a line-count target. Test additions below are recommendations unless `--fix` or explicit review-and-fix authorization applies.
 
 ## Test selection
 

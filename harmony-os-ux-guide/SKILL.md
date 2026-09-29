@@ -1,20 +1,17 @@
 ---
 name: harmony-os-ux-guide
-description: "用户提到 UX 设计、用户体验、设计规范、交互设计、界面布局、组件选型、设计走查、设计评审、多设备适配、动效设计 时必须使用本技能。基于华为官方 UX 设计指南整理的 163 篇设计参考：设计原则、组件、布局、交互、多设备适配、动效与行业案例，默认提取适用于网页、后台、安卓、iOS 等场景的通用设计方法；鸿蒙系统专用资料仅在目标平台匹配时按需加载，不作为跨平台实现规范。"
-version: 1.2.0
-author: scraped from developer.huawei.com
-tags: [harmonyos, ux, design-guide, components, multi-device, responsive]
+metadata:
+  version: "1.3.0"
+  author: scraped from developer.huawei.com
+  tags: [harmonyos, ux, design-guide, components, multi-device, responsive]
+description: "查询 UX 设计规范、组件选型、交互规则、多设备适配、动效规范或做设计走查时使用（UX guidelines, component spec, interaction design, multi-device, HarmonyOS design）。基于华为官方 UX 设计指南整理的 163 篇参考，默认提取适用于网页、后台、安卓、iOS 的通用设计方法；鸿蒙专用资料仅在目标平台为 HarmonyOS 时加载。直接生成或改造页面时优先使用 frontend-design-ultra，本技能作为规范查询来源。"
 ---
 
 # HarmonyOS UX 设计指南
 
-本 skill 包含华为 HarmonyOS 官方 UX 设计指南的全量抓取内容（163 篇），按主题分为 19 个子目录。适用于：
+本技能包含华为 HarmonyOS 官方 UX 设计指南的全量抓取内容（163 篇），按主题分为 19 个子目录，用于设计走查、组件与交互规范查询、多设备适配和行业案例参考。
 
-- HarmonyOS 应用 UX 评审与设计走查
-- 组件选型与交互规范查询
-- 多设备（手机/平板/折叠屏/PC/智慧屏/穿戴/智能座舱）适配方案
-- 响应式布局与行业案例参考
-- 动效设计与系统特性集成
+参考文件多为官网原文，部分含大段 HTML 表格，单篇可达 100–300 KB。读取时先用搜索定位关键词所在段落，再按行范围读取，不整篇加载。
 
 ## 使用方式
 

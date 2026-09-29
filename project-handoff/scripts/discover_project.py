@@ -63,7 +63,8 @@ def handoff_info(directory: Path) -> dict:
             "markdown_count": sum(item.suffix.lower() == ".md" for item in files),
             "file_count": len(files),
             "latest_modified": max((iso_time(item) for item in files), default=None),
-            "has_analysis_report": (folder / "analysis-report.json").exists(),
+            "has_analysis_report": (folder / ".handoff" / "analysis-report.json").exists()
+                                   or (folder / "analysis-report.json").exists(),
         })
     return {"found": bool(locations), "locations": locations}
 

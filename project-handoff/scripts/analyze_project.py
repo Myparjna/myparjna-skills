@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scan the project and emit ProjectDoc/analysis-report.json for handoff doc generation."""
+"""Scan the project and emit ProjectDoc/.handoff/analysis-report.json for handoff doc generation."""
 from pathlib import Path
 from datetime import datetime, timezone
 import argparse
@@ -12,11 +12,11 @@ import subprocess
 import sys
 import tomllib
 
-from _handoff_common import force_utf8_console, read_handoff_config
+from _handoff_common import (TOOL_VERSION, force_utf8_console, read_handoff_config, redact_args,
+                             redact_url, redact_value, report_path)
 
 ROOT = Path.cwd()
 OUT_DIR = ROOT / "ProjectDoc"
-TOOL_VERSION = "3.1.2"
 SCHEMA_VERSION = 3
 
 # --- 配置（可被 .handoff.yml 覆盖） ---
@@ -45,6 +45,8 @@ MAX_FILE_SIZE = 512_000
 MAX_GREP_FILES = 3000
 MAX_KEY_FILES = 40
 INCLUDE_DIRS = []
+# User-level agent configuration (~/.claude, ~/.agents) is machine-specific and may hold secrets.
+INCLUDE_USER_CONFIG = False
 # 默认跳过所有隐藏目录，但以下隐藏目录含交接关键事实（CI、agent 配置），需进入扫描
 HIDDEN_DIR_ALLOWLIST = {
     ".github", ".circleci", ".claude", ".agents", ".cursor", ".vscode", ".idea",
@@ -139,31 +141,50 @@ def rel_path(path: Path) -> str:
     return str(path.relative_to(ROOT)).replace("\\", "/")
 
 
+def _keep_dir(parent: str, name: str) -> bool:
+    """Prune before descending: skipped names, hidden dirs, links and virtualenvs."""
+    lower = name.lower()
+    if lower in _skip_dirs_lower() or lower.endswith((".egg-info", ".dist-info")):
+        return False
+    if name.startswith(".") and lower not in HIDDEN_DIR_ALLOWLIST:
+        return False
+    full = os.path.join(parent, name)
+    if os.path.islink(full) or os.path.isfile(os.path.join(full, "pyvenv.cfg")):
+        return False
+    try:
+        # Windows junctions are not reported by islink on older Pythons.
+        if os.stat(full, follow_symlinks=False).st_file_attributes & 0x400:
+            return False
+    except (AttributeError, OSError):
+        pass
+    return True
+
+
+def walk_files(base: Path, patterns=None):
+    """Yield files under base, never entering node_modules, venvs or other skipped trees."""
+    import fnmatch
+    if not base.is_dir():
+        return
+    for current, dirs, files in os.walk(base):
+        dirs[:] = sorted(d for d in dirs if _keep_dir(current, d))
+        for name in sorted(files):
+            if patterns is None or any(fnmatch.fnmatch(name, p) for p in patterns):
+                yield Path(current) / name
+
+
 def iter_files():
     global ITERATION_TRUNCATED
     ITERATION_TRUNCATED = False
-    stack = list(scan_roots())
     count = 0
-    while stack:
-        current = stack.pop()
-        try:
-            entries = sorted(current.iterdir())
-        except OSError:
-            continue
-        for path in entries:
-            if path.is_dir():
-                if not is_skipped_path(path) and (
-                    not path.name.startswith(".") or path.name.lower() in HIDDEN_DIR_ALLOWLIST
-                ):
-                    stack.append(path)
-            elif path.is_file():
-                count += 1
-                if count > MAX_GREP_FILES * 3:
-                    ITERATION_TRUNCATED = True
-                    if sys.stderr.isatty():
-                        sys.stderr.write(f"\n[warn] 扫描截断：已扫描 {count} 文件，部分文件未覆盖\n")
-                    return
-                yield path
+    for root in scan_roots():
+        for path in walk_files(root):
+            count += 1
+            if count > MAX_GREP_FILES * 3:
+                ITERATION_TRUNCATED = True
+                if sys.stderr.isatty():
+                    sys.stderr.write(f"\n[warn] 扫描截断：已扫描 {count} 文件，部分文件未覆盖\n")
+                return
+            yield path
 
 
 def collect_source_texts():
@@ -198,11 +219,7 @@ def count_total_files():
     total = 0
     skip = _skip_dirs_lower()
     for root_dir, dirs, files in os.walk(ROOT):
-        dirs[:] = [
-            d for d in dirs
-            if d.lower() not in skip and not d.endswith((".egg-info", ".dist-info"))
-            and (not d.startswith(".") or d.lower() in HIDDEN_DIR_ALLOWLIST)
-        ]
+        dirs[:] = [d for d in dirs if d.lower() not in skip and _keep_dir(root_dir, d)]
         total += len(files)
     return total
 
@@ -270,7 +287,8 @@ def load_python_deps(req_paths, pyproject_paths):
         try:
             data = tomllib.loads(read_text(path))
         except tomllib.TOMLDecodeError as exc:
-            raise SystemExit(f'ERROR: 无法解析 {rel_path(path)}: {exc}') from exc
+            sys.stderr.write(f'[warn] 跳过无法解析的 {rel_path(path)}: {exc}\n')
+            continue
         project = data.get('project', {})
         groups = [project.get('dependencies', [])]
         groups.extend(project.get('optional-dependencies', {}).values())
@@ -310,9 +328,7 @@ def detect_package_manager():
         if any((root / lockfile).exists() for root in roots):
             managers.append(manager)
     has_package_json = any(
-        path.name == "package.json" and not is_skipped_path(path)
-        for root in roots
-        for path in root.glob("**/package.json")
+        True for root in roots for _ in walk_files(root, ("package.json",))
     )
     if has_package_json and not any(m in managers for m in ("npm", "pnpm", "yarn", "bun")):
         managers.append("npm (inferred, no lockfile)")
@@ -461,7 +477,7 @@ def detect_cloudflare():
             "d1_databases": re.findall(r'\[\[d1_databases\]\]\s*\n\s*binding\s*=\s*"([^"]+)"', content),
             "r2_buckets": re.findall(r'\[\[r2_buckets\]\]\s*\n\s*binding\s*=\s*"([^"]+)"', content),
         }
-    if (ROOT / "functions").is_dir() and any((ROOT / "functions").rglob("*.js")):
+    if (ROOT / "functions").is_dir() and any(walk_files(ROOT / "functions", ("*.js",))):
         result["pages_functions"] = True
     if (ROOT / "_headers").exists() or (ROOT / "public" / "_redirects").exists():
         result["pages_config_files"] = True
@@ -538,8 +554,7 @@ def detect_kubernetes():
     # 也扫描根目录和1层子目录下所有含 kind: 的 YAML
     yaml_files = []
     for d in k8s_dirs:
-        yaml_files.extend(d.rglob("*.yaml"))
-        yaml_files.extend(d.rglob("*.yml"))
+        yaml_files.extend(walk_files(d, ("*.yaml", "*.yml")))
     # 额外扫描根目录下的 k8s 相关 YAML
     for p in list(ROOT.glob("*.yaml")) + list(ROOT.glob("*.yml")) + list(ROOT.glob("*/*.yaml")) + list(ROOT.glob("*/*.yml")):
         if p.is_file() and p not in yaml_files:
@@ -695,7 +710,7 @@ def detect_env_vars(texts):
                     if re.match(r"^[A-Z][A-Z0-9_]*$", key) and key not in declared:
                         declared[key] = {
                             "source": source,
-                            "default": value.strip() if name in template_names else "<redacted: real env file>",
+                            "default": redact_value(key, value.strip()) if name in template_names else "<redacted: real env file>",
                         }
     used = set()
     used_locations = {}
@@ -897,7 +912,7 @@ def detect_api_routes(texts):
     for base in ("app/api", "src/app/api", "pages/api", "src/pages/api"):
         directory = ROOT / base
         if directory.is_dir():
-            for path in directory.rglob("*.*"):
+            for path in walk_files(directory):
                 if path.suffix in (".ts", ".js", ".tsx"):
                     routes.append("/" + str(path.relative_to(ROOT / base.split("/")[0])).replace("\\", "/"))
     pattern = re.compile(r"(?:app|router|api_router)\.(get|post|put|delete|patch|route)\(\s*['\"]([^'\"]+)")
@@ -1036,7 +1051,8 @@ def detect_mcp_servers():
     home = Path.home()
     user_settings = home / ".claude" / "settings.json"
 
-    for settings_path in [project_settings, user_settings]:
+    settings_paths = [project_settings] + ([user_settings] if INCLUDE_USER_CONFIG else [])
+    for settings_path in settings_paths:
         if not settings_path.exists():
             continue
         try:
@@ -1054,10 +1070,10 @@ def detect_mcp_servers():
                     # stdio 类型
                     if "command" in config:
                         server_info["command"] = config["command"]
-                        server_info["args"] = config.get("args", [])[:5]
+                        server_info["args"] = redact_args(config.get("args", [])[:5])
                     # sse/http 类型
                     if "url" in config:
-                        server_info["url"] = config["url"]
+                        server_info["url"] = redact_url(config["url"])
                 servers.append(server_info)
         except (json.JSONDecodeError, OSError):
             continue
@@ -1074,8 +1090,8 @@ def detect_mcp_servers():
                         "name": name,
                         "scope": "project (.mcp.json)",
                         "command": config.get("command"),
-                        "args": config.get("args", [])[:5],
-                        "url": config.get("url"),
+                        "args": redact_args(config.get("args", [])[:5]),
+                        "url": redact_url(config.get("url")),
                     }
                     servers.append(server_info)
         except (json.JSONDecodeError, OSError):
@@ -1110,10 +1126,10 @@ def detect_dev_platform():
     # 用户全局 skills
     home = Path.home()
     global_skills_dir = home / ".claude" / "skills"
-    global_skills = [p.name for p in global_skills_dir.iterdir() if p.is_dir()] if global_skills_dir.is_dir() else []
+    global_skills = [p.name for p in global_skills_dir.iterdir() if p.is_dir()] if INCLUDE_USER_CONFIG and global_skills_dir.is_dir() else []
     # ~/.agents/skills（另一种全局位置）
     agents_skills_dir = home / ".agents" / "skills"
-    agents_skills = [p.name for p in agents_skills_dir.iterdir() if p.is_dir()] if agents_skills_dir.is_dir() else []
+    agents_skills = [p.name for p in agents_skills_dir.iterdir() if p.is_dir()] if INCLUDE_USER_CONFIG and agents_skills_dir.is_dir() else []
 
     all_skills = sorted(set(project_skills + global_skills + agents_skills))
 
@@ -1221,12 +1237,8 @@ def detect_testing(node_scripts):
                 "*.spec.tsx", "*.test.tsx", "*_test.go", "*_test.rs", "*Tests.cs", "*Test.java")
     test_files = []
     for root in scan_roots():
-        for pattern in patterns:
-            for path in root.rglob(pattern):
-                if path.is_file() and not is_skipped_path(path):
-                    test_files.append(rel_path(path))
-                    if len(test_files) >= 200:
-                        break
+        for path in walk_files(root, patterns):
+            test_files.append(rel_path(path))
             if len(test_files) >= 200:
                 break
         if len(test_files) >= 200:
@@ -1265,7 +1277,7 @@ def git_info():
         except (OSError, subprocess.SubprocessError):
             return ""
     return {
-        "remote": run(["remote", "get-url", "origin"]),
+        "remote": redact_url(run(["remote", "get-url", "origin"])),
         "branch": run(["rev-parse", "--abbrev-ref", "HEAD"]),
         "hash": run(["rev-parse", "HEAD"]),
         "last_commit": run(["log", "-1", "--format=%h %ad %s", "--date=short"]),
@@ -1372,7 +1384,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--no-baseline", action="store_true",
                         help="Do not preserve the current analysis report as the comparison baseline")
+    parser.add_argument("--include-user-config", action="store_true",
+                        help="Also record user-level MCP servers and skills from ~/.claude and ~/.agents")
     args = parser.parse_args()
+    global INCLUDE_USER_CONFIG
+    INCLUDE_USER_CONFIG = args.include_user_config
     load_config()
 
     # 统计文件总数（用于扫描完整性报告）
@@ -1437,12 +1453,18 @@ def main() -> None:
     report_str = json.dumps(report, indent=2, ensure_ascii=False)
 
     OUT_DIR.mkdir(exist_ok=True)
-    out = OUT_DIR / "analysis-report.json"
-    state_dir = OUT_DIR / ".handoff"
+    out = report_path(OUT_DIR)
+    state_dir = out.parent
     baseline = state_dir / "analysis-report.previous.json"
     verified = state_dir / "analysis-report.verified.json"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    legacy = OUT_DIR / "analysis-report.json"
+    if legacy.exists() and not out.exists():
+        legacy.replace(out)
+        print(f"Moved legacy report to {out.relative_to(ROOT)}")
+    elif legacy.exists():
+        legacy.unlink()
     if not args.no_baseline and (verified.exists() or (out.exists() and not baseline.exists())):
-        state_dir.mkdir(exist_ok=True)
         source = verified if verified.exists() else out
         baseline.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
         print(f"Previous verified report preserved at {baseline.relative_to(ROOT)}")

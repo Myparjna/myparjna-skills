@@ -25,7 +25,7 @@ font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans S
 - 每个字重 woff2 约 5MB：默认不引；确需引入时只声明实际用到的档位，正文元素不继承这个家族，不能让整页文本都去等字体下载。
 - 中文标题需要单独家族时：钉钉进步体等从 `references/02-headline-heiti.md` 候选中取；无明确需要时标题沿用正文家族（系统栈）。
 - 数字与代码用 JetBrains Mono 等已验证等宽字体或 `tabular-nums`；西文数字体积小，可按需引入，也可直接用系统等宽栈。
-- 图标：Tabler / Lucide / Iconify 任选一套主库，经 CDN 加载使用；不从本地取图标文件，不手写、不手绘、不凭几何印象拼 SVG 图形，不把别处看到的 path 手工抄进页面，也不用 `<symbol>`+`<use>` 自建精灵图。用下面两种加载式方案之一（2026-09 实测可达）：
+- 图标：Tabler / Lucide / Iconify 任选一套主库，同页只用这一套。图形必须来自图标库：经 CDN 加载，或经 `better-icons` 等工具从图标库导出的 SVG 代码写入项目，二者均合规；禁止凭记忆或几何印象手绘 path。CDN 方式可用下面两种方案之一（2026-09 实测可达）：
   1. **Tabler 图标字体**（最省事，推荐）：引入 `https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css`，用 `<i class="ti ti-search" aria-hidden="true"></i>`；`ti-` 后的名称即 Tabler 官方图标名。
   2. **Lucide 运行时**：引入 `https://unpkg.com/lucide@0.462.0/dist/umd/lucide.min.js`，写 `<i data-lucide="search" aria-hidden="true"></i>`，脚本末尾调用 `lucide.createIcons()`；动态插入 DOM 后需再次调用。
   只有确实需要零运行时依赖、且项目明确要求时，才改用 Iconify 官方接口（`https://api.iconify.design/tabler.json?icons=...`）取原样 body，同样是把库的产出原样使用，不是自己画；此路仅在项目提出该要求时启用。

@@ -19,7 +19,7 @@ Apply only rules that improve comprehension or reduce a verified defect risk in 
 
 ## Duplication and abstraction
 
-- Apply the rule of three before abstracting repeated logic.
+- Treat repetition as a lead, not a threshold: verify shared responsibility and compatible evolution before abstracting even three occurrences.
 - Prefer data-driven tables when they make variation explicit and preserve order.
 - Do not create a one-use utility, generic wrapper, speculative configuration, or framework layer.
 - Keep helpful domain abstractions even when they add lines.
@@ -54,7 +54,7 @@ Short ❌/✅ pairs that anchor the judgment boundaries. Adapt to the repository
 
 ```ts
 // ❌ Preconditions are buried inside nested branches
-function discount(user: User, cart: Cart): number {
+function discount(user: User | null, cart: Cart): number {
   if (user) {
     if (user.isMember) {
       if (cart.total > 100) {
@@ -66,9 +66,9 @@ function discount(user: User, cart: Cart): number {
 }
 
 // ✅ Each precondition is visible and testable on its own line
-function discount(user: User, cart: Cart): number {
+function discount(user: User | null, cart: Cart): number {
   if (!user?.isMember) return 0;
-  if (cart.total <= 100) return 0;
+  if (!(cart.total > 100)) return 0;
   return cart.total * 0.1;
 }
 ```
@@ -88,12 +88,12 @@ function serviceFee(isVip: boolean, amount: number): number {
 }
 ```
 
-### Rule of three over speculative helpers (duplication)
+The negated comparison preserves the original result for `NaN`; `<= 100` would not.
+
+### Shared responsibility over superficial duplication
 
 ```python
-# ❌ Two similar blocks with small differences: keep them separate for now.
-# Extracting a shared helper with flags here would couple two cases
-# that may evolve independently.
+# Keep separate policies when they can evolve independently.
 def price_usd(item):
     base = item.cost * 1.08
     return round(base, 2)
@@ -102,12 +102,9 @@ def price_eur(item):
     base = item.cost * 1.21
     return round(base, 2)
 
-# ✅ Once a third case appears, extract with the variation made explicit.
-TAX_RATES = {"usd": 1.08, "eur": 1.21}
-
-def price(item, currency):
-    return round(item.cost * TAX_RATES[currency], 2)
 ```
+
+Three similar functions would still not prove one shared policy. If a common calculation is established, an internal helper may preserve these existing entrypoints; replacing them with `price(item, currency)` changes the public interface and introduces new failure cases.
 
 ### Delete, do not comment out (dead code)
 

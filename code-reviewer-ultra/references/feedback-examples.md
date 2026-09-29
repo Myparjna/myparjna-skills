@@ -25,21 +25,20 @@ Use a finding shape that lets the author reproduce and fix the issue quickly.
 ## Change impact
 
 ```markdown
-### [P1][HIGH][scope] Config rename breaks existing deployments
+### [P1][HIGH][bug] Config rename breaks existing deployments
 - File: `config/load.ts:18`
 - Evidence: `VIDEO_URL` was removed and no compatibility alias or migration exists; callers and deployment manifests still use it.
 - Impact: Existing processes fail at startup after upgrade.
 - Fix: Read both keys with a deprecation warning, update manifests, and add an old-config startup test.
 ```
 
-## Tests
+## Missing tests (limitation, not a finding)
+
+Missing coverage is recorded under limitations, never as a titled finding:
 
 ```markdown
-### [P1][MEDIUM][test] New failure path has no regression coverage
-- File: `client/stream.ts:93-108`
-- Evidence: A timeout now returns a fallback result, but no test asserts the timeout, cleanup, or caller-visible status.
-- Impact: A future refactor can silently turn the fallback into a false success.
-- Fix: Add an integration test with a timed-out upstream and assert cleanup plus the returned status.
+## Limitations
+- `client/stream.ts:93-108`: the new timeout fallback has no test asserting cleanup or the caller-visible status, so its behavior was verified by reading only. Suggested test: a timed-out upstream with assertions on cleanup and returned status.
 ```
 
 ## Useful calibration

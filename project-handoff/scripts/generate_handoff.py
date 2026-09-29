@@ -7,14 +7,31 @@ import shutil
 import sys
 from datetime import datetime
 
-from _handoff_common import force_utf8_console, normalize_doc_names
+from _handoff_common import force_utf8_console, normalize_doc_names, report_path, TOOL_VERSION
 from _handoff_documents import BASE_DOCS, TOPIC_DOCS, LEGACY_DOCS, load_document_plan, selected_docs
 from _handoff_migration import combine, migrate_legacy_docs
 
 ROOT = Path.cwd()
 OUT = ROOT / "ProjectDoc"
-REPORT_PATH = OUT / "analysis-report.json"
+REPORT_PATH = report_path(OUT)
 DEFAULT_PLAN_PATH = ROOT / "TempScr" / "project-handoff-plan.json"
+
+
+def warn_if_subdirectory(allowed: bool) -> None:
+    """Stop when run below the Git top level, which would scatter ProjectDoc/ into a subfolder."""
+    import subprocess
+    try:
+        result = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=ROOT,
+                                capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return
+    if result.returncode:
+        return
+    top = Path(result.stdout.strip()).resolve()
+    if top == ROOT.resolve() or allowed:
+        return
+    sys.exit(f"ERROR: 当前目录 {ROOT} 不是 Git 仓库根目录 {top}。"
+             "请切换到项目根目录运行；如确需在子目录生成交接文档，追加 --allow-subdir。")
 
 
 def load_plan(plan_path: Path | None) -> dict:
@@ -547,16 +564,21 @@ def main():
                         help="handoff-plan JSON 路径；默认自动读取 TempScr/project-handoff-plan.json")
     parser.add_argument("--ignore-plan", action="store_true",
                         help="忽略 handoff-plan，按默认检测逻辑生成全部文档")
+    parser.add_argument("--update-plan", default="TempScr/project-handoff-update-plan.md",
+                        help="compare_handoff.py 产出的更新建议路径（与其 --output-dir 保持一致）")
+    parser.add_argument("--allow-subdir", action="store_true",
+                        help="确认在 Git 仓库子目录中生成交接文档")
     args = parser.parse_args()
+    warn_if_subdirectory(args.allow_subdir)
 
     if not REPORT_PATH.exists():
-        sys.exit("ERROR: 先运行 scripts/analyze_project.py 生成 analysis-report.json")
+        sys.exit("ERROR: 缺少 ProjectDoc/.handoff/analysis-report.json，请先运行 scripts/analyze_project.py")
     r = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
 
     # schema 版本检查
     schema_ver = r.get("schema_version", 0)
     if schema_ver < 3:
-        print(f"[WARN] analysis-report.json 的 schema_version={schema_ver}，当前工具 3.1.2 需要 schema_version>=3。"
+        print(f"[WARN] analysis-report.json 的 schema_version={schema_ver}，当前工具 {TOOL_VERSION} 需要 schema_version>=3。"
               "建议重新运行 analyze_project.py。")
 
     OUT.mkdir(exist_ok=True)
@@ -623,7 +645,7 @@ def main():
 
     print(f"\n模式: {mode}; 新写入 {written} 份，保留 {preserved} 份。")
     if mode == "update":
-        print("下一步：读取 TempScr/project-handoff-update-plan.md、旧文档和变更源码，只原地修改受影响章节。")
+        print(f"下一步：读取 {args.update_plan}、旧文档和变更源码，只原地修改受影响章节。")
     else:
         print("下一步：按 skill 目录下的 fill-guide.md 逐个消除 TODO(AI)，然后运行 verify_handoff.py。")
 

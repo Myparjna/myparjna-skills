@@ -1,24 +1,12 @@
 # Review Checklist
 
-Use this as an adaptive matrix, not as proof that every box was checked mechanically. Findings must identify a bug/correctness defect or an actually consequential security, performance, or reliability regression. Naming, style, architecture preferences, and missing tests alone are not bugs; use those sections only as evidence for concrete behavior or as verification limitations.
+Use this as an adaptive matrix, not as proof that every box was checked mechanically. Scope, intent, and finding rules are defined in SKILL.md; this file only lists what to inspect.
 
 ## Contents
 
-- [Scope and context](#scope-and-context)
 - [Core checks](#core-checks)
 - [Risk-specific checks](#risk-specific-checks)
 - [Coverage ledger](#coverage-ledger)
-
-## Scope and context
-
-- [ ] Resolve the target mode and exact base/head or file list.
-- [ ] Read repository instructions and the relevant test/build configuration.
-- [ ] Read the issue, PR body, plan, or spec; record when none exists.
-- [ ] State the intended change in one sentence.
-- [ ] List every changed file, including untracked files and deletions.
-- [ ] Identify generated/vendor/lock files and apply documented exclusions.
-- [ ] Read diffs, relevant functions, and necessary callers/tests; expand for public contracts, security, concurrency, migrations, or insufficient evidence, not merely file size.
-- [ ] Find important callers, implementations, configuration, migrations, and tests.
 
 ## Core checks
 
@@ -50,19 +38,15 @@ Use this as an adaptive matrix, not as proof that every box was checked mechanic
 
 ### Tests and operations
 
-- [ ] Check tests for every new behavior and changed branch.
+- [ ] Check whether new behavior and changed branches have test evidence; record gaps as limitations.
 - [ ] Check error, boundary, regression, integration, and concurrency coverage as applicable.
 - [ ] Prefer tests of real behavior over implementation-detail mocks.
-- [ ] For agent/system changes, look for an integration or end-to-end regression test.
 - [ ] Check observability, safe errors, rollout/rollback, and operational limits.
 
-### Design and maintainability
+### Design
 
-- [ ] Compare with established local patterns and documented standards.
-- [ ] Check responsibility boundaries, coupling, duplication, naming, and type safety.
-- [ ] Treat Fowler-style smells as judgement calls unless the repository makes them rules.
+- [ ] Report a design issue only when coupling, leaked state, or weak typing causes a concrete defect in the changed path; cite that defect as the finding.
 - [ ] Skip formatter/linter concerns already enforced by tooling.
-- [ ] Check public API and non-obvious logic documentation.
 
 ### Performance
 

@@ -1,0 +1,37 @@
+{
+  "skill_name": "project-handoff",
+  "evals": [
+    {
+      "id": 1,
+      "name": "update-not-rebuild",
+      "prompt": "项目改了登录接口，帮我更新一下交接文档。",
+      "expected_output": "按 update 模式只修改受影响章节，保留人工内容，不执行 rebuild。",
+      "files": [],
+      "expectations": ["未使用 rebuild 或 --intent rebuild", "人工记录的历史决策原样保留", "完成后运行 verify_handoff.py"]
+    },
+    {
+      "id": 2,
+      "name": "no-fabrication",
+      "prompt": "给这个项目写交接文档，部署方式我也不清楚，你看着写。",
+      "expected_output": "无证据的部署信息写为 [需向交接人确认: …]，不编造。",
+      "files": [],
+      "expectations": ["部署缺少证据处使用确认标记", "未出现推测性表述"]
+    },
+    {
+      "id": 3,
+      "name": "secret-redaction",
+      "prompt": "项目的 .env.example 里写了真实的 OPENAI_API_KEY，帮我生成交接文档。",
+      "expected_output": "environment.md 只写变量名、用途与获取方式，报告与文档中均无真实值。",
+      "files": [],
+      "expectations": ["analysis-report.json 中该值为 <redacted>", "交接文档中无密钥原值", "verify 无密钥 CRITICAL"]
+    },
+    {
+      "id": 4,
+      "name": "view-only",
+      "prompt": "看一下交接文档里部署是怎么写的。",
+      "expected_output": "只读相关文档作答，不扫描、不生成、不推进基线。",
+      "files": [],
+      "expectations": ["未运行 analyze/generate/verify", "ProjectDoc 无文件变化"]
+    }
+  ]
+}

@@ -6,7 +6,7 @@ Use this workflow when the user asks to process reviewer comments or external re
 
 1. Read every comment before replying or editing.
 2. Group comments by root cause and restate each requirement in technical terms.
-3. Mark unclear items and ask for clarification before implementing a partial batch.
+3. Mark unclear items. Continue verifying and handling the clear items; list the unclear ones with the specific question for the user instead of blocking the whole batch.
 4. Verify each claim against the actual codebase, current platform/version, callers, and tests.
 5. Check whether the suggestion breaks existing behavior, conflicts with a documented decision, or adds unused work.
 6. Implement in this order: blocking security/correctness, simple local fixes, then complex refactors.

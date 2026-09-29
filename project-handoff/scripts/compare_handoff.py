@@ -9,12 +9,12 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-from _handoff_common import force_utf8_console
+from _handoff_common import force_utf8_console, report_path
 from _handoff_documents import selected_docs, load_document_plan, LEGACY_DOCS
 
 ROOT = Path.cwd()
 DOC_DIR = ROOT / "ProjectDoc"
-CURRENT_REPORT = DOC_DIR / "analysis-report.json"
+CURRENT_REPORT = report_path(DOC_DIR)
 PREVIOUS_REPORT = DOC_DIR / ".handoff" / "analysis-report.previous.json"
 VERIFIED_REPORT = DOC_DIR / ".handoff" / "analysis-report.verified.json"
 
@@ -204,7 +204,7 @@ def main() -> None:
     parser.add_argument("--output-dir", default="TempScr", help="Directory for update-plan JSON and Markdown")
     args = parser.parse_args()
     if not CURRENT_REPORT.exists():
-        raise SystemExit("ERROR: 缺少 ProjectDoc/analysis-report.json，请先运行 analyze_project.py")
+        raise SystemExit("ERROR: 缺少 ProjectDoc/.handoff/analysis-report.json，请先运行 analyze_project.py")
     current = load_json(CURRENT_REPORT)
     previous = load_json(PREVIOUS_REPORT)
     # git 范围优先以最近一次验收通过的 verified 基线为准，其次才是 previous

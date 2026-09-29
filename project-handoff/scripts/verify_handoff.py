@@ -5,12 +5,12 @@ import json
 import re
 import sys
 
-from _handoff_common import force_utf8_console
+from _handoff_common import force_utf8_console, report_path
 from _handoff_documents import BASE_DOCS, REQUIRED_SECTIONS, applied_docs
 
 ROOT = Path.cwd()
 OUT = ROOT / "ProjectDoc"
-REPORT_PATH = OUT / "analysis-report.json"
+REPORT_PATH = report_path(OUT)
 
 REQUIRED_DOCS = set(BASE_DOCS)
 
@@ -81,7 +81,7 @@ def _is_placeholder(match_text, context):
 
 def load_report():
     if not REPORT_PATH.exists():
-        sys.exit("ERROR: 缺少 ProjectDoc/analysis-report.json")
+        sys.exit("ERROR: 缺少 ProjectDoc/.handoff/analysis-report.json，请先运行 analyze_project.py")
     return json.loads(REPORT_PATH.read_text(encoding="utf-8"))
 
 
@@ -196,7 +196,7 @@ def check_residual_docs(docs, report):
     issues = []
     expected = applied_docs(ROOT, report)
     actual = {p.name.lower() for p in docs}
-    residual = actual - expected - {"analysis-report.json"}
+    residual = actual - expected
     if residual:
         issues.append(("WARN", f"发现可能的残留文档: {', '.join(residual)}（上次运行遗留？）"))
     return issues

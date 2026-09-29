@@ -1,7 +1,81 @@
 """Shared helpers for project-handoff scripts."""
 
 import io
+import re
 import sys
+from urllib.parse import urlsplit, urlunsplit
+
+TOOL_VERSION = "3.2.0"
+REPORT_NAME = "analysis-report.json"
+
+
+def report_path(doc_dir):
+    """Machine scan report lives with other state files, not beside handoff documents."""
+    return doc_dir / ".handoff" / REPORT_NAME
+
+
+_SECRET_NAME = re.compile(r"(KEY|SECRET|TOKEN|PASSWORD|PASSWD|PWD|CREDENTIAL|AUTH|PRIVATE|DSN)", re.I)
+_SECRET_VALUE = re.compile(r"^(sk-|sk_|ghp_|gho_|github_pat_|xox[abp]-|AKIA|AIza|eyJ)|[A-Za-z0-9+/_\-]{32,}")
+
+
+def looks_secret(name, value):
+    value = (value or "").strip().strip('"\'')
+    if not value:
+        return False
+    return bool(_SECRET_NAME.search(name or "")) or bool(_SECRET_VALUE.search(value))
+
+
+def redact_value(name, value):
+    return "<redacted>" if looks_secret(name, value) else value
+
+
+def redact_url(url):
+    """Drop userinfo and query string, which commonly carry tokens."""
+    if not isinstance(url, str) or "://" not in url:
+        return url
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return "<redacted>"
+    host = parts.hostname or ""
+    if parts.port:
+        host += f":{parts.port}"
+    return urlunsplit((parts.scheme, host, parts.path, "", ""))
+
+
+def redact_args(args):
+    """Redact secret-looking CLI args and the value following a secret-named flag."""
+    result, hide_next = [], False
+    for arg in args if isinstance(args, list) else []:
+        text = str(arg)
+        if hide_next:
+            result.append("<redacted>")
+            hide_next = False
+            continue
+        name, sep, value = text.partition("=")
+        if sep and looks_secret(name, value):
+            result.append(f"{name}=<redacted>")
+        elif text.startswith("-") and _SECRET_NAME.search(text):
+            result.append(text)
+            hide_next = True
+        elif "://" in text:
+            result.append(redact_url(text))
+        elif _SECRET_VALUE.search(text):
+            result.append("<redacted>")
+        else:
+            result.append(text)
+    return result
+
+
+def read_text_lenient(path):
+    """Read UTF-8 (with BOM) first, then GB18030; never crash on legacy encodings."""
+    data = path.read_bytes()
+    for encoding in ("utf-8-sig", "gb18030"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
 
 
 def read_handoff_config(root):
@@ -11,7 +85,7 @@ def read_handoff_config(root):
     path = root / '.handoff.yml'
     if not path.exists():
         return config
-    for number, raw in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
+    for number, raw in enumerate(read_text_lenient(path).splitlines(), 1):
         quote, escaped, chars = None, False, []
         for char in raw:
             if char == '#' and quote is None:
@@ -83,7 +157,11 @@ def normalize_doc_names(directory):
     # Only same-directory Markdown destinations; source paths and prose are preserved.
     pattern = re.compile(r'(?P<prefix>\]\(<?(?:\./)?|^\s*\[[^]\n]+\]:\s*<?(?:\./)?)(?P<name>[A-Za-z-]+\.md)(?=[#)>\s]|$)', re.MULTILINE)
     for path in files:
-        original = path.read_text(encoding='utf-8')
+        try:
+            original = path.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            print(f'  [warn] {path.name} 不是 UTF-8 编码，跳过链接规范化')
+            continue
         updated = pattern.sub(lambda m: m['prefix'] + (m['name'].lower() if m['name'].lower() in names else m['name']), original)
         if original != updated:
             edits[path.name.lower() if path.name.lower() in names else path.name] = updated

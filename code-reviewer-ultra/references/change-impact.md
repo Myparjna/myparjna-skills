@@ -18,7 +18,7 @@ Quote the relevant spec line or say `no spec available`. Do not infer a missing 
 
 ### Standards axis
 
-Check relevant repository instructions, type configuration, and established patterns as evidence for concrete behavior. Cite the source and rule where useful; naming, style, architecture preferences, and missing tests alone are not independent bugs, even when documented standards mention them.
+Check relevant repository instructions, type configuration, and established patterns. A violation that causes concrete impact becomes evidence inside that finding; a violation without concrete impact goes into the report's Standards notes and does not affect the verdict.
 
 ## Breaking-change surfaces
 
@@ -36,19 +36,14 @@ For each suspected break, record old contract, new contract, affected caller, mi
 
 ## Change size
 
-- Judge small changes by behavioral impact and dependencies, not line count alone.
-- Start with the diff, relevant functions, and necessary callers/tests; do not read whole files when that evidence suffices.
-- Expand context for public contracts, security, concurrency, migrations, or unresolved behavior; use size only as a secondary staging signal.
-
-Use the actual diff and dependencies to propose the smallest coherent stage. Do not recommend arbitrary splitting that breaks a runnable behavior boundary.
+Use size only as a secondary staging signal. Use the actual diff and dependencies to propose the smallest coherent stage. Do not recommend arbitrary splitting that breaks a runnable behavior boundary.
 
 ## Agent context and state
 
 For agent/runtime changes, check:
 
 - incremental context construction; no history rewrite;
-- hard caps on every injected item, prompt fragment, file, and model output;
-- no new item that can exceed 10K tokens without explicit review;
+- hard caps on every injected item, prompt fragment, file, and model output, following any limit the repository documents;
 - cache-sensitive context changes and stable fragment types;
 - dynamic state lookup versus stale closure capture;
 - multi-instance resource ownership, bounded logs, and safe resume;

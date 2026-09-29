@@ -10,7 +10,7 @@
 
 悬停态：折叠屏设备处于完全展开和折叠的中间状态，可平稳放置。
 
-<table id="ZH-CN_TOPIC_0000001957023989__table1927920312015" style="border-style: none;" class="no-border layoutFixed idpTab"><tbody><tr id="ZH-CN_TOPIC_0000001957023989__row132791311508"><td class="cell-norowborder" style="border: none;" valign="top" width="100%"><p id="ZH-CN_TOPIC_0000001957023989__p24411981115"><span><img originheight="4780" originwidth="4988" src="https://alliance-communityfile-drcn.dbankcdn.com/FileServer/getFile/cmtyPub/011/111/111/0000000000011111111.20250701110326.98609697057973376044061038527969:50001231000000:2800:40EE3B4042C9E86092D046D6E8266F7EB58DE6F095F8742B0C556EEDA400E983.png" title="点击放大" width="587" height="562.5220529270249"></span></p></td></tr><tr id="ZH-CN_TOPIC_0000001957023989__row142794319020"><td class="cellrowborder" style="border: none;" valign="top" width="100%">&nbsp;&nbsp;</td></tr></tbody></table>
+<table><tbody><tr><td><p><span><img originheight="4780" originwidth="4988" src="https://alliance-communityfile-drcn.dbankcdn.com/FileServer/getFile/cmtyPub/011/111/111/0000000000011111111.20250701110326.98609697057973376044061038527969:50001231000000:2800:40EE3B4042C9E86092D046D6E8266F7EB58DE6F095F8742B0C556EEDA400E983.png" title="点击放大" height="562.5220529270249"></span></p></td></tr><tr><td>&nbsp;&nbsp;</td></tr></tbody></table>
 
 ## 体验设计点
 

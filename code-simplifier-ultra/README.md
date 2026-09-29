@@ -1,74 +1,46 @@
 # Code Simplifier Ultra
 
-证据驱动的代码简化与行为保持重构技能。只在改动能带来具体的可读性、可维护性或经过验证的缺陷风险收益时才动手；保持行为、公共契约、项目约定和运维护栏不变。**一个有充分依据的 no-op 也是合法结果。**
+版本 2.3.0 聚焦轻量代码精简：在保持有效行为和代码质量的前提下，减少耦合、重复状态、多余封装和理解成本，让开发者与 AI 更容易追踪功能、定位责任和持续修改项目。
 
-## 本次小幅调整（2026-09-05）
+## 工作方式
 
-仅做行为保持精简，事后审查只纠正本次精简引入的回归；旧 bug 只报告。按影响判断小改动，先读 diff、相关函数及必要调用和测试，证据充分不通读全文件；公共契约、安全并发、迁移再展开。简报保留发现或改动、验证实际结果和限制，完整模板按需使用；来源记录保持不变。
+理解实际调用链，找到可以消除的复杂度，按职责完成小批改动，再运行足以发现相关错误的检查。优先收拢分散的业务知识、减少调用方协调和双向依赖；拆文件、增加接口或减少代码行数本身不构成收益。
 
-## 模式
+已授权的精简直接执行；需要用户取舍的候选在回复中说明位置、收益、风险和推荐项。输出简短文字，不生成 HTML 或独立报告，不强制绘图、设计追问或全库扫描。参考资料仅在遇到对应问题时加载。
 
-| 调用方式 | 行为 |
-| --- | --- |
-| 默认 / `--simplify --review` | 先简化，再检查并修正本次简化引入的回归 |
-| `--simplify` | 仅简化，仍做最小 diff 与行为保持自检 |
-| `--review` | 只读检查，不修改 |
-| `--no-report` | 返回精简工作笔记（供编排器调用） |
-| `--no-verify` | 可执行检查交父级验证，仍保留最小自检并披露未运行项 |
+## 测试与自动检查
 
-参数可传路径、glob、commit/PR 范围或范围描述。
+测试、CI 步骤及质量阈值也可精简：核实其发现的故障、适用行为和剩余保护，删除没有独立价值的重复项、过时项或绑定实现细节的检查。保留必要的失败路径、安全、兼容与数据保护；项目强制检查按既有规则处理。具体标准见 [验证与测试精简](references/verification-and-reporting.md)。
 
-## 工作流（六步）
+## 调用
 
-1. **解析并冻结范围** — 范围解析一次，编辑后不再重算或扩大。
-2. **发现项目规则与护栏** — 读最近的 AGENTS.md / CLAUDE.md / 清单与 lint 配置；显式列出"绝不可被简化掉"的运维护栏。
-3. **建立行为证据** — 记录必须保持不变的可观测面；尽可能跑基线测试。
-4. **按优先级应用最小可辩护改动** — 控制流 → 清晰性 → 去重（三次法则）→ 死代码 → 语言惯用法。
-5. **按表面与风险审查** — 从 security / configuration / data-formats / naming / 语言档案中选择适用表面，发现必须带位置、触发条件、失败模式、证据。
-6. **验证最终状态** — 验证阶梯 + 回归守卫；跳过的检查必须如实披露。
-
-## 目录结构
-
-```
-code-simplifier-ultra/
-├── SKILL.md                        # 主入口：模式、参数、六步工作流
-├── references/
-│   ├── scope-and-context.md        # 证据清单、护栏识别、边界规则
-│   ├── behavior-parity.md          # 行为保持表、证据阶梯、等价性陷阱
-│   ├── simplification-rules.md     # 简化规则 + ❌/✅ 判断边界示例
-│   ├── review-profiles.md          # security / configuration / data-formats / naming 审查档案
-│   ├── language-profiles.md        # JS/TS、Python/FastAPI、Rust、Go、Shell 按需加载
-│   └── verification-and-reporting.md # 验证阶梯、回归守卫、报告格式、阻塞条件
-├── scripts/
-│   └── scope_snapshot.py           # 确定性 Git 范围快照（支持 --base 范围）
-└── agents/
-    └── openai.yaml                 # OpenAI agent 接口描述
+```text
+使用 $code-simplifier-ultra 精简订单流程，减少重复状态和多余封装，保持行为。
+使用 $code-simplifier-ultra 检查无效测试和重复 CI 步骤，删除没有独立保护价值的项。
+使用 $code-simplifier-ultra --survey --broad 简短列出候选，供我选择。
 ```
 
-## 脚本用法
+原有参数保持兼容：`--simplify` 执行精简，`--review` 单独使用时只读，`--survey` / `--architecture` 调查候选，`--broad` 扩大授权范围的覆盖，`--no-verify` 披露并推迟可执行检查，`--no-report` 返回最短工作结论。明确只读请求优先。
 
-```bash
-# 快照未提交改动 + 未跟踪文件
-python scripts/scope_snapshot.py --repo <仓库路径>
+## 维护入口
 
-# 快照一个 PR / commit 范围（base...HEAD）
-python scripts/scope_snapshot.py --repo <仓库路径> --base main
+- [SKILL.md](SKILL.md)：主流程与参数规则。
+- [结构判断](references/structural-proof.md)：跨文件删除、消费者和净收益。
+- [职责与耦合](references/architecture-survey.md)：模块收敛与调用方负担。
+- [行为保持](references/behavior-parity.md)：容易遗漏的等价性要求。
+- [评估场景](evals/evals.json)：局部精简、动态消费者、文字候选和测试检查取舍。
 
-# 追加大纲外路径；--include-excluded 保留通常被排除的文件（仍会在 would_exclude 中报告）
-python scripts/scope_snapshot.py --path src/app.py --include-excluded
-```
+范围快照脚本仅辅助记录差异，使用限制见 [范围说明](references/scope-and-context.md)。技能不依赖其他技能、可视化工具或独立评审代理。执行速度和令牌节省需实测，文档缩短不代表运行性能已提升。
 
-## 与 code-reviewer-ultra 的分工
+## 来源
 
-本技能只做**行为保持精简及本次精简回归的最小修正**，旧 bug 只报告。更广泛的 bug 审查属于 code-reviewer-ultra 的职责；不默认调用另一审查技能，串联需由用户或上级工作流明确安排。
+本次融合 [tt-a1i/simplify-codebase](https://github.com/tt-a1i/simplify-codebase) 和 [mattpocock/skills](https://github.com/mattpocock/skills) 的架构普查、模块设计、设计追问与领域建模方法。固定版本和适配差异见来源记录。
 
-## 出处
+保留既有来源：
 
-融合并升级自以下社区技能：
-
-- [getsentry/skills `agents/code-simplifier`](https://github.com/getsentry/skills/blob/main/agents/code-simplifier.md) — 行为保持与平衡哲学
-- [PaulRBerg/agent-skills `code-simplify` → `code-polish`](https://github.com/PaulRBerg/agent-skills) — 冻结范围、双模式、风险分级、表面档案、结构化报告
-- [pproenca/dot-skills `code-simplifier`](https://github.com/pproenca/dot-skills) — 47 条规则的优先级分类
-- [rtk-ai/rtk `code-simplifier`](https://github.com/rtk-ai/rtk) — 项目约束清单、前后对照示例、改后回归守卫（已泛化）
-- [aktsmm/Agent-Skills `code-simplifier`](https://github.com/aktsmm/Agent-Skills) — 触发场景与完成清单
-- simonwong/writing-skills `code-simplifier` — getsentry agent 的社区变体
+- [getsentry/skills](https://github.com/getsentry/skills/blob/main/agents/code-simplifier.md)：行为保持与平衡原则。
+- [PaulRBerg/agent-skills](https://github.com/PaulRBerg/agent-skills)：范围冻结、模式、风险与报告。
+- [pproenca/dot-skills](https://github.com/pproenca/dot-skills)：简化规则分类。
+- [rtk-ai/rtk](https://github.com/rtk-ai/rtk)：项目约束与回归检查。
+- [aktsmm/Agent-Skills](https://github.com/aktsmm/Agent-Skills)：触发场景与完成清单。
+- simonwong/writing-skills：getsentry agent 的社区变体。

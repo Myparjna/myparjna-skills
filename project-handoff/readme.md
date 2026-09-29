@@ -1,57 +1,27 @@
-# Myparjna 精选技能合集
+# Project Handoff
 
-> Myparjna Skills Collection — 适用于 Codex、Claude Code、OpenCode 及兼容 Agent 运行时的可复用技能集合。
+依据项目源码、配置与扫描结果，创建、查看、比对、增量更新或重建 `ProjectDoc/` 交接文档的技能。执行规则以 SKILL.md 为准。
 
-## 包含技能（11）
+## 流程
 
-| Skill | 用途 | 大小 |
-|-------|------|------|
-| `code-reviewer-ultra` | 证据化代码评审 v2.0.0（Spec/Standards、安全、变更影响、测试与 Agent 安全） | ~30 KB |
-| `code-simplifier-ultra` | 证据驱动代码简化与行为保持重构 v2.1.0 | ~40 KB |
-| `project-handoff` | 项目交接文档生成（三段式流水线，新版） | ~30 KB |
-| `online-fonts-icons` | CDN 中文字体（46款）与图标库（5套）集成指南 | ~20 KB |
-| `amap-jsapi-skill` | 高德地图 JS API v2.0 开发集成指南 | ~92 KB |
-| `amap-lbs-skill` | 高德地图 LBS 综合服务（POI/路径/热力图） | ~50 KB |
-| `amap-cli-skill` | 高德地图 CLI 操控工具 | ~23 KB |
-| `harmony-os-ux-guide` | 华为完整体验设计手册（原华为体验手册skill_extracted） | ~800 KB |
-| `modelscope-search` | 魔搭社区 ModelScope 模型搜索（200K+ 模型） | ~5 KB |
-| `see-tools` | S.EE 短网址 / 文本分享 / 图床工具 | ~5 KB |
-| `skillsmp-search` | SkillsMP 技能市场搜索 | ~5 KB |
+1. `discover_project.py`：定位项目根目录与已有交接目录。
+2. `analyze_project.py`：扫描项目，输出 `ProjectDoc/.handoff/analysis-report.json`。
+3. `plan_handoff.py`、`compare_handoff.py`：生成文档计划与更新建议，写入 `TempScr/`。
+4. `generate_handoff.py`：生成或补齐文档骨架，由 AI 依据证据填写。
+5. `verify_handoff.py`：校验文档集合、章节、密钥模式与链接，通过后推进验收基线。
 
-## 安装
+## 安全说明
 
-安装单个技能：
+- 模板环境文件中疑似密钥的默认值、MCP 配置中的 URL 查询参数与密钥参数、Git 远程地址中的用户信息均在写入报告前脱敏。
+- 默认只扫描项目级配置；用户目录下的 MCP 配置与全局技能列表需显式传入 `--include-user-config` 才会读取。
+
+## 测试
 
 ```bash
-npx skills add https://github.com/Myparjna/myparjna-skills --skill code-reviewer-ultra --yes
-npx skills add https://github.com/Myparjna/myparjna-skills --skill code-simplifier-ultra --yes
-npx skills add https://github.com/Myparjna/myparjna-skills --skill project-handoff --yes
-npx skills add https://github.com/Myparjna/myparjna-skills --skill online-fonts-icons --yes
-npx skills add https://github.com/Myparjna/myparjna-skills --skill harmony-os-ux-guide --yes
+uv run --no-project --with pytest python -m pytest tests -q
 ```
 
-列出所有可安装技能：
+## 版本
 
-```bash
-npx skills add https://github.com/Myparjna/myparjna-skills --list
-```
-
-## code-simplifier-ultra v2.1.0
-
-证据驱动的代码简化与行为保持重构技能：冻结工作范围，发现项目规则与运维护栏，建立行为证据，应用最小可辩护改动，并按风险表面完成审查与验证。
-
-## code-reviewer-ultra v2.0.0 设计来源
-
-本版本在保留 OMC 的 `Severity + Confidence` 机制基础上，重新吸收并改造了：
-
-- Gemini CLI：目标识别、准备流程和多维度评审；
-- Jeffallan：意图 checkpoint、上下文/结构/测试顺序和具体反馈；
-- Matt Pocock：固定比较点、Spec/Standards 双轴和并行评审；
-- Vercel Open Agents：完整文件上下文、真实攻击路径和只评审变更；
-- Anthropic：简洁的安全/性能/正确性/可维护性报告结构；
-- OpenAI Codex：破坏性变更、变更规模、上下文上限和 Agent 集成测试；
-- obra Superpowers：发起评审、只读代理和接收反馈后的验证/反驳/逐项修复；
-- CodeRabbit / Alibaba OCR：可选外部引擎的数据外发边界、规则解析和覆盖率账本；
-- NVIDIA SkillSpector：Skill/MCP 的静态安全门和工具权限审查理念。
-
-验证包括技能规范校验、独立代理前向评审和安装副本同步校验。
+- v3.2.0（2026-09-29）：扫描报告迁入 `ProjectDoc/.handoff/`；增加密钥脱敏与用户级配置开关；修复非 UTF-8 配置、pyproject 解析失败导致中止、符号链接循环等问题；补充 evals 与脱敏测试。
+- v3.1.2：平衡版 8 份基础文档加按需专题。

@@ -1,11 +1,17 @@
 ---
 name: project-handoff
-description: "用户提到 交接文档、更新交接文档、重建交接文档、比对交接文档、查看交接文档、更新文档、项目交付、交接给同事或 AI 时必须使用本技能；想把项目整理成一套完整文档时也使用。创建、增量更新、比对或重建项目交接文档。默认增量更新，仅当用户明确说“重建/重新生成”才全量重置。"
+metadata:
+  version: "3.2.0"
+description: "创建、查看、比对、增量更新或重建项目交接文档时使用（project handoff, handoff docs, project documentation for successor）：交接文档、项目交付、交接给同事或 AI、把项目整理成一套完整文档。默认增量更新，仅当用户明确说“重建/重新生成”才全量重置。只修改单篇 README、编写接口文档或会议纪要时不使用。"
 ---
 
 # Project Handoff
 
-依据实际源码、配置、扫描报告和用户回答维护 `ProjectDoc/`。采用 8 份基础文档加按需专题。脚本需要 Python 3.11+，可用 `uv run --no-project python` 运行。
+依据实际源码、配置、扫描报告和用户回答维护 `ProjectDoc/`。采用 8 份基础文档加按需专题。
+
+下文命令中的 `<skill>` 指本 SKILL.md 所在目录，须替换为该目录的绝对路径；所有脚本在选定的项目根目录下运行。脚本需要 Python 3.11+，可用 `uv run --no-project python` 运行。
+
+扫描默认只读取项目内配置。仅当用户要求记录本机全局 skills 或用户级 MCP 配置时，才给 `analyze_project.py` 加 `--include-user-config`。报告中的密钥类取值、URL 凭据与查询参数一律脱敏。
 
 ## 按请求选择范围
 
@@ -33,7 +39,7 @@ description: "用户提到 交接文档、更新交接文档、重建交接文�
 仅在位置不明、多项目或首次探索时运行：
 
 ```bash
-python /absolute/path/to/project-handoff/scripts/discover_project.py --start . --max-depth 3
+python <skill>/scripts/discover_project.py --start . --max-depth 3
 ```
 
 检查项目标志和已有交接目录，不能只凭修改时间选目录。单一明确目标直接采用；多个目标且用户意图不明时询问，禁止扫描整个父工作区。之后在选定项目根目录运行脚本。
@@ -43,20 +49,20 @@ python /absolute/path/to/project-handoff/scripts/discover_project.py --start . -
 ## 阶段 2：收集事实
 
 ```bash
-python /absolute/path/to/project-handoff/scripts/analyze_project.py
+python <skill>/scripts/analyze_project.py
 ```
 
-生成 `ProjectDoc/analysis-report.json`。`.handoff/analysis-report.verified.json` 为稳定验收基线，重复扫描不推进它。报告包含重点文件和已扫描文本指纹；扫描范围有限，不能替代源码阅读。
+生成 `ProjectDoc/.handoff/analysis-report.json`（机器中间产物，不与交接文档并列；旧位置的报告会自动迁入）。同目录的 `analysis-report.verified.json` 为稳定验收基线，重复扫描不推进它。报告包含重点文件和已扫描文本指纹；扫描范围有限，不能替代源码阅读。
 
 ## 阶段 3：计划与影响检查
 
 ```bash
-python /absolute/path/to/project-handoff/scripts/plan_handoff.py --intent update
+python <skill>/scripts/plan_handoff.py --intent update
 ```
 
 按实际模式替换 intent。计划写入 `TempScr/project-handoff-plan.md/.json`，快速检查文档、focus 和扫描范围后自动继续，不增加例行确认。
 
-更新或比对时再运行 `scripts/compare_handoff.py`（使用技能绝对路径），产出 `TempScr/project-handoff-update-plan.md/.json`。简要告知受影响内容后继续已授权工作。首次创建无需新旧比对。
+更新或比对时再运行 `python <skill>/scripts/compare_handoff.py`，产出 `TempScr/project-handoff-update-plan.md/.json`。简要告知受影响内容后继续已授权工作。首次创建无需新旧比对。
 
 专题很简单时可在计划中 skip，并在对应基础文档写清内容；8 份基础文档保留。计划只提供机器证据，不能禁止有源码依据的语义更新。
 
@@ -73,7 +79,7 @@ python /absolute/path/to/project-handoff/scripts/plan_handoff.py --intent update
 - 具体部署平台：`references/deployment-platforms.md` 中对应章节。
 
 ```bash
-python /absolute/path/to/project-handoff/scripts/generate_handoff.py --mode update --client-level developer
+python <skill>/scripts/generate_handoff.py --mode update --client-level developer
 ```
 
 create 首次创建；update 只补缺失文档；rebuild 备份后重建。根据实际模式执行。生成器尊重计划的专题选择，导航与验收使用相同集合。AI 补齐新文档，并原地修改旧文档受影响章节。
@@ -85,7 +91,7 @@ create 首次创建；update 只补缺失文档；rebuild 备份后重建。根�
 ## 阶段 5：检查与交付
 
 ```bash
-python /absolute/path/to/project-handoff/scripts/verify_handoff.py
+python <skill>/scripts/verify_handoff.py
 ```
 
 检查实际文档集合、核心章节、TODO、密钥模式、本地文档链接、文件引用及事实覆盖。有错误则修复后复验。静态校验通过不等于业务测试全部完成；如实记录未执行项。通过后推进基线，直接交付 `ProjectDoc/`，不生成 ZIP。

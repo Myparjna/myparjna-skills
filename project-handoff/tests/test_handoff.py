@@ -98,17 +98,17 @@ class HandoffTests(unittest.TestCase):
         (self.root/'package.json').write_text('{"name":"fixture"}',encoding='utf-8')
         with patch.object(Path,'home',return_value=self.root/'fake-home'), contextlib.redirect_stdout(io.StringIO()), patch.object(sys,'argv',['scan']):
             a.main()
-        return json.loads((self.docs/'analysis-report.json').read_text(encoding='utf-8'))
+        return json.loads((self.docs/'.handoff'/'analysis-report.json').read_text(encoding='utf-8'))
 
     def generate(self, *args):
-        with patch.object(g,'REPORT_PATH',self.docs/'analysis-report.json'), patch.object(g,'DEFAULT_PLAN_PATH',self.root/'TempScr/project-handoff-plan.json'), patch.object(sys,'argv',['generate',*args]),contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(g,'REPORT_PATH',self.docs/'.handoff'/'analysis-report.json'), patch.object(g,'DEFAULT_PLAN_PATH',self.root/'TempScr/project-handoff-plan.json'), patch.object(sys,'argv',['generate',*args]),contextlib.redirect_stdout(io.StringIO()):
             g.main()
 
     def test_generator_balanced_and_optional_skip(self):
         report=self.report()
         report['api_routes']=['GET /hello (app.py)']
         report['desktop']=[{'type':'Electron','version':'1'}]
-        (self.docs/'analysis-report.json').write_text(json.dumps(report),encoding='utf-8')
+        (self.docs/'.handoff'/'analysis-report.json').write_text(json.dumps(report),encoding='utf-8')
         folder=self.root/'TempScr'
         folder.mkdir()
         (folder/'project-handoff-plan.json').write_text(json.dumps({'documents':[{'name':'api.md','action':'skip'},{'name':'desktop.md','action':'skip'}]}),encoding='utf-8')
@@ -145,7 +145,7 @@ class HandoffTests(unittest.TestCase):
         for f in self.docs.glob('*.md'):
             content=re.sub(r'<!-- TODO\(AI\): .*? -->','[需向交接人确认: 隔离测试事项]',f.read_text(encoding='utf-8'),flags=re.S)
             f.write_text(content,encoding='utf-8')
-        with patch.object(v,'REPORT_PATH',self.docs/'analysis-report.json'),contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(v,'REPORT_PATH',self.docs/'.handoff'/'analysis-report.json'),contextlib.redirect_stdout(io.StringIO()):
             v.main()
         self.assertTrue((self.docs/'.handoff/analysis-report.verified.json').exists())
         snapshot=(self.docs/'usage.md').read_bytes()
@@ -179,15 +179,41 @@ class HandoffTests(unittest.TestCase):
     def test_custom_plan_is_used_by_validation(self):
         report=self.report()
         report['api_routes']=['GET /hello (app.py)']
-        (self.docs/'analysis-report.json').write_text(json.dumps(report),encoding='utf-8')
+        (self.docs/'.handoff'/'analysis-report.json').write_text(json.dumps(report),encoding='utf-8')
         custom=self.root/'custom-plan.json'
         custom.write_text(json.dumps({'documents':[{'name':'api.md','action':'skip'}]}),encoding='utf-8')
         self.generate('--plan',str(custom))
         for f in self.docs.glob('*.md'):
             f.write_text(re.sub(r'<!-- TODO\(AI\): .*? -->','[需向交接人确认: 隔离测试事项]',f.read_text(encoding='utf-8'),flags=re.S),encoding='utf-8')
-        with patch.object(v,'REPORT_PATH',self.docs/'analysis-report.json'),contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(v,'REPORT_PATH',self.docs/'.handoff'/'analysis-report.json'),contextlib.redirect_stdout(io.StringIO()):
             v.main()
 
 
 if __name__=='__main__':
     unittest.main()
+
+
+class WalkAndGuardTests(unittest.TestCase):
+    def test_walk_prunes_dependency_dirs_and_venv(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel in ('node_modules/x/a.test.js', '.venv/lib/b_test.py', 'myenv/c_test.py', 'src/d.test.js'):
+                (root / rel).parent.mkdir(parents=True, exist_ok=True)
+                (root / rel).write_text('x', encoding='utf-8')
+            (root / 'myenv' / 'pyvenv.cfg').write_text('home = x', encoding='utf-8')
+            with patch.object(a, 'ROOT', root):
+                found = a.detect_tests([]) if hasattr(a, 'detect_tests') else None
+                files = [a.rel_path(p) for p in a.walk_files(root)]
+            self.assertIn('src/d.test.js', files)
+            self.assertFalse(any(f.startswith(('node_modules', '.venv', 'myenv')) for f in files))
+
+    def test_generate_refuses_git_subdirectory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            subprocess.run(['git', 'init', '-q'], cwd=root, check=True)
+            sub = root / 'sub'
+            sub.mkdir()
+            with patch.object(g, 'ROOT', sub), self.assertRaises(SystemExit):
+                g.warn_if_subdirectory(False)
+            with patch.object(g, 'ROOT', sub):
+                g.warn_if_subdirectory(True)

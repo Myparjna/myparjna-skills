@@ -1,0 +1,104 @@
+{
+  "skill_name": "code-simplifier-ultra",
+  "evals": [
+    {
+      "id": 1,
+      "name": "local-parity",
+      "prompt": "精简 pricing.py 的 discount，只改善可读性，保持行为。其他文件保持原样，运行现有测试。",
+      "expected_output": "保持 NaN、临界值和空用户结果；仅修改指定函数，执行并报告测试。",
+      "files": [
+        "evals/fixtures/local-parity"
+      ],
+      "expectations": [
+        "仅修改 pricing.py 的目标函数",
+        "包括 NaN 在内的现有测试全部通过",
+        "说明具体精简收益且未启动架构普查"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "dynamic-consumer",
+      "prompt": "handlers.py 里的 legacy_receipt 看起来没调用，帮我清掉这个死代码；仅在能证明无用时删除。请检查所需上下文并验证。",
+      "expected_output": "发现字符串注册、历史数据格式和 ADR，保留可达功能，报告证据和测试。",
+      "files": [
+        "evals/fixtures/dynamic-consumer"
+      ],
+      "expectations": [
+        "保留动态使用的 legacy_receipt",
+        "明确引用 loader、registry 和历史数据消费者",
+        "说明 ADR 与缺乏静态调用不能证明可删除"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "architecture-survey",
+      "prompt": "这个干净仓库的订单逻辑分散在多个小模块，先做全范围精简调查，在回复中简短列出值得合并的候选、收益和风险；不要修改文件或生成 HTML。指出最值得先探索的一项，选完再讨论。",
+      "expected_output": "干净仓库仍可完成调查；直接回复候选、覆盖、ADR 限制和验证缺口，不生成报告文件，不修改业务或文档。",
+      "files": [
+        "evals/fixtures/architecture-survey"
+      ],
+      "expectations": [
+        "没有修改任何输入文件且未因干净仓库终止",
+        "覆盖订单与网关并分别给出处理结论",
+        "候选包含消费者、净收益、置信度与验证缺口",
+        "回复中简短区分现状与提议并等待选择，没有生成 HTML 或报告文件",
+        "保留 ADR 保护的单实现支付接口"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "check-value",
+      "prompt": "仅根据以下已核实事实，简短判断精简选择，不编辑文件：CI 的 A 与 B 在相同环境、输入和产物上执行相同 unittest 命令，B 无独立重试或发布职责；一个旧测试只断言内部 helper 被调用，保留的入口测试已覆盖其返回值及相关失败路径；一个鉴权测试正在失败且无重复覆盖；覆盖率阈值来自当前有效的团队强制规则。哪些可以移除，哪些应保留或另行决策？仅回复结论、理由和必要验证，不生成报告。",
+      "expected_output": "可移除重复 CI 步骤和无独立覆盖价值的内部调用测试；保留失败鉴权测试并报告故障；强制阈值未经规则变更授权不得删除。",
+      "files": [],
+      "expectations": [
+        "按相同运行条件和故障检测能力认定重复 CI 步骤",
+        "根据已保留的行为覆盖移除内部调用断言，而非要求保留全部测试",
+        "保留唯一且失败的鉴权检查，不以精简名义制造通过",
+        "遵守团队强制规则，直接简短回复且不生成文件"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "grounded-no-op",
+      "prompt": "帮我精简 local-parity 里的 pricing.py，如果已经足够简单就直说。",
+      "expected_output": "判断现有代码无明显可消除复杂度时，给出有依据的无需改动结论，不为改而改。",
+      "files": [
+        "evals/fixtures/local-parity"
+      ],
+      "expectations": [
+        "若无实质收益则不修改文件",
+        "结论引用具体代码事实而非泛泛而谈",
+        "不以拆分文件或重命名制造改动"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "review-read-only",
+      "prompt": "--review 看看 handlers.py 有哪些可以精简的地方。",
+      "expected_output": "单独使用 --review 时只给出候选与风险，不修改任何文件。",
+      "files": [
+        "evals/fixtures/dynamic-consumer"
+      ],
+      "expectations": [
+        "没有修改任何输入文件",
+        "候选包含位置、收益与风险",
+        "对动态使用的 legacy_receipt 标注不可直接删除"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "no-split-for-decoupling",
+      "prompt": "订单模块耦合太重了，帮我解耦，给出建议即可，不要修改文件。",
+      "expected_output": "优先建议收拢职责与移除转发层，不以拆分更多文件或新增接口作为解耦手段；保留 ADR 保护的接口。",
+      "files": [
+        "evals/fixtures/architecture-survey"
+      ],
+      "expectations": [
+        "未建议新增无实际替换需求的接口或抽象层",
+        "未把单纯拆分文件当作解耦收益",
+        "没有修改任何输入文件"
+      ]
+    }
+  ]
+}

@@ -1,113 +1,74 @@
 ---
 name: code-simplifier-ultra
-argument-hint: "[paths|range] [--simplify] [--review] [--no-report] [--no-verify]"
-description: "用户提到 简化代码、清理代码、重构、优化可读性、删除死代码、消除重复 时必须使用本技能。证据驱动的行为保持重构：最小改动、按风险面审查、附验证证据。"
+metadata:
+  version: "2.4.0"
+argument-hint: "[--simplify|--review|--survey|--architecture] [--broad] [--no-verify] [--no-report] [路径]"
+description: "精简代码、降低耦合、消除重复状态与多余封装、清理死代码和无效测试检查时使用（simplify, refactor for simplicity, decouple, dead code, remove duplication, code review for complexity）。在保持有效行为与代码质量的前提下，收拢职责、理顺调用链，让开发者和 AI 更容易理解与修改现有项目。新增功能、性能调优、修复无关缺陷时不使用。"
 ---
 
 # Code Simplifier Ultra
 
-Simplify code only when the change has a concrete readability, maintainability, or verified defect-risk benefit. Preserve behavior, public contracts, project conventions, and operational safeguards. A well-supported no-op is a valid result.
+Reduce the knowledge needed to understand and safely change a feature. Prefer clear ownership, direct control flow, fewer synchronized facts, and small useful interfaces. Fewer lines or files alone do not establish a simpler design.
 
-## Arguments
+## Scope and intent
 
-- Paths, patterns, a commit/PR range, or a scope phrase: resolved once in Workflow §1, then frozen.
-- `--simplify`: simplify without the separate review pass; still perform the minimum diff and behavior-parity self-check in §6.
-- `--review`: read-only inspection of the frozen scope; skip simplification and all edits, and report findings only.
-- Neither or both: simplify first, then check and correct only regressions introduced by this simplification.
-- `--no-report`: return terse working notes instead of the full report (for orchestrator callers).
-- `--no-verify`: defer executable checks to the parent workflow; never skip the minimum diff and behavior-parity self-check, and disclose deferred checks.
+Follow the user's intent: implement requested simplifications; investigate proposals read-only. Preserve existing work and project conventions. Use explicit paths first, otherwise recent changes. A repository survey can use entrypoints and change hotspots even with a clean worktree. Inspect callers beyond the edit scope when needed without silently editing them.
 
-Do not silently expand a simplify request into architecture redesign, feature work, dependency upgrades, or a repository-wide rewrite. Only make behavior-preserving simplifications and correct regressions they introduce; report pre-existing bugs without fixing them. Broader review is separate work: do not invoke another review skill by default.
+Mode flags decide whether files change:
+
+| Invocation | Edits files | Review pass after editing |
+|---|---|---|
+| No flag, or `--simplify --review` | Yes | Yes: fix regressions introduced by this change |
+| `--simplify` | Yes | No separate pass; still check the changed behavior |
+| `--review` alone | No | Findings only |
+| `--survey` or `--architecture` (any combination) | No | Candidates only; architecture targets cross-module complexity |
+
+Modifier flags:
+- `--broad`: cover the whole authorized repository scope and report material gaps.
+- `--no-verify`: skip executable checks, still inspect the diff, and state the gap.
+- `--no-report`: reply with only the result, verification, and unresolved decisions.
+
+Explicit read-only wording from the user wins over any edit flag. Ask only for missing decisions that affect behavior or scope; reuse authorization already given.
 
 ## Workflow
 
-### 1. Resolve and freeze the scope
+### 1. Understand the feature path
 
-Resolve the scope once before editing and retain it for the entire task.
+When the scope comes from recent changes in a Git repository, run `python scripts/scope_snapshot.py --repo <repo>` (add `--base <rev>` for a branch or PR range) and treat its `scope` list as the frozen edit scope; files outside it are read-only context. Skip this for explicit single-file requests or non-Git projects.
 
-- Prefer explicit files, directories, a commit/PR range, or a user-provided scope.
-- Otherwise inspect files modified in the current session. If session history is unavailable, use uncommitted tracked and untracked files.
-- Use [`scripts/scope_snapshot.py`](scripts/scope_snapshot.py) when a reproducible Git scope snapshot is useful; pass `--base <rev>` for a commit/PR range.
-- Exclude lockfiles, generated output, vendored code, minified bundles, build folders, coverage, and large snapshots unless explicitly included. Validate excluded outputs through their generator, schema, or invariant instead.
-- Stop if the resolved scope is empty or ambiguous. Ask for a target rather than guessing.
+Read applicable project instructions, the changed code, its callers, and relevant tests. Trace input → decisions/state → output and side effects. Consult domain terms or architecture decisions only when the candidate touches them. Expand reading until the responsibility and observable behavior are clear, then stop.
 
-Do not recompute or broaden the scope after editing. Read [scope-and-context.md](references/scope-and-context.md) for boundary rules.
+### 2. Find the complexity that can disappear
 
-### 2. Discover project rules and guardrails before judging code
+Prioritize the largest concrete maintenance burden in scope:
+- Consolidate scattered knowledge about one responsibility; remove forwarding layers that add no policy or isolation.
+- Reduce bidirectional dependencies, leaked internals, duplicate state, and caller-managed sequencing.
+- Remove proved dead code, unused flexibility, and abstractions that cost more to understand than they hide.
+- Simplify branching and names where this makes the real feature path easier to follow.
 
-Judge small changes by impact rather than line count. Start with the diff, relevant functions, and necessary callers/tests; evidence that suffices does not require whole-file reading. Read applicable repository instructions and only relevant handoff, manifests, configuration, or neighboring patterns. Expand context for public contracts, security, concurrency, migrations, or unresolved behavior.
+Decoupling does not mean splitting more files or adding interfaces. Keep cohesive logic together; retain separation where ownership, independent change, isolation, or real substitution requires it. Avoid speculative frameworks, generic helpers, dependency additions, and broad renaming.
 
-Project-local conventions outrank generic advice. Do not impose a framework, function style, naming scheme, error pattern, or formatter preference that the repository does not use.
+For cross-file removal or uncertain consumers, read [structural-proof.md](references/structural-proof.md). For unclear module ownership, read [architecture-survey.md](references/architecture-survey.md). A local cleanup needs neither a full inventory nor a candidate dossier.
 
-Identify:
+### 3. Apply a small coherent change
 
-- language, runtime, framework, module system, and supported targets;
-- public API and compatibility boundaries;
-- formatter, linter, type checker, test runner, build and validation commands;
-- generated/vendor boundaries;
-- existing patterns worth preserving;
-- **operational guards that must never be simplified away**: fallback paths, feature flags, retries, timeouts, telemetry, compatibility shims, mandatory error context, static caches. List them explicitly before editing and re-check them in §6.
+Keep supported behavior, public interfaces, stored formats, errors, ordering, and necessary security/resource safeguards intact. Check [behavior-parity.md](references/behavior-parity.md) when these are at risk. An existing bug is reported separately unless its repair is in scope.
 
-### 3. Establish behavior evidence
+Complete one responsibility at a time and validate before continuing with other authorized changes. Do not spread a removed layer's complexity into its callers. If simplification requires a product decision or an unrequested compatibility change, present that candidate for selection and continue independent safe work. Undo only this task's edits if a change proves unsound.
 
-Before editing, identify the observable surface that must remain identical: values and output, public contracts, errors, side effects, timing and resources, security behavior. [behavior-parity.md](references/behavior-parity.md) holds the full preservation table, the evidence ladder, and common parity traps — read it before changing code with external effects or public contracts.
+Tests and automated checks can also be simplified: remove obsolete, duplicate, or implementation-coupled checks when they add no unique protection for supported behavior. Follow [verification-and-reporting.md](references/verification-and-reporting.md) for the evidence needed; do not preserve checks merely because they exist.
 
-Run the narrowest relevant baseline test or invariant when practical. If no baseline is available, record the gap and use static evidence plus targeted post-change checks.
+### 4. Verify and report briefly
 
-### 4. Identify candidates, then apply the smallest defensible change
+Inspect the final diff and run the smallest checks capable of exposing mistakes in this change. Broaden only for affected shared behavior or concrete uncertainty; do not repeat equivalent checks, invent arbitrary quality thresholds, or add tests that restate the implementation. Fix regressions introduced here rather than extending into a general audit.
 
-Prioritize changes in this order:
+Report directly in the conversation, without HTML, report files, mandatory diagrams, or a design interview:
+- **Changes or candidates:** location, complexity removed, expected benefit, and material risk; recommend a choice when needed.
+- **Verification:** checks actually run and relevant gaps, including protection retained after test/check removal.
+- **Decision needed:** only unresolved choices; omit when none remain.
 
-1. **Control flow**: guard clauses, early returns, flattened nesting, explicit branches, simpler boolean logic, no nested ternaries.
-2. **Clarity**: intention-revealing names, consistent vocabulary, explicit intermediate values, removal of misleading or obvious comments.
-3. **Duplication**: remove real duplication only when the abstraction reduces total complexity; prefer the rule of three over speculative helpers.
-4. **Dead code**: remove code proven unreachable, unused, stale, or commented-out; preserve compatibility shims and feature gates unless evidence says otherwise.
-5. **Language idioms**: use the language or standard-library idiom only when it is clearer in this repository and preserves error, allocation, ordering, and performance behavior.
+Explain each fact once. When nothing is worth simplifying, say so with the reason instead of forcing a change. Describe benefits as concrete expected effects (for example "one place now owns the retry rule", "callers no longer sequence init and load"); do not run benchmarks or quote speed, size, or token numbers.
 
-Avoid line-count optimization, dense one-liners, clever expression chains, one-use abstractions, broad renames, sync/async conversion, speculative configurability, and unrelated cleanup. Read [simplification-rules.md](references/simplification-rules.md) when choosing a transformation; it includes ❌/✅ worked examples for the judgment boundaries.
+## Optional references
 
-### 5. Review by surface and risk when review mode is active
-
-After simplification, review only regressions introduced by this task. With `--review` alone, inspect the frozen scope read-only. Select applicable surfaces and read only relevant sections in [review-profiles.md](references/review-profiles.md):
-
-| Surface | Profile |
-| --- | --- |
-| auth, secrets, crypto, external input/network, unsafe parsing | `security` |
-| env, config, timeouts, retries, pools, limits | `configuration` |
-| CSV/JSON/YAML/binary, schemas, migrations, generated data | `data-formats` |
-| naming and intent clarity | `naming` |
-| language/framework-specific behavior | matching profile in [language-profiles.md](references/language-profiles.md) |
-
-For each finding, prove the location, triggering input/state, failure mode, blast radius, and evidence. Use this priority:
-
-- **CRITICAL**: exploitable security issue, data loss, or critical outage path.
-- **HIGH**: behavior, error-path, boundary, or core performance defect.
-- **MEDIUM**: context-dependent behavior or resource regression with concrete impact.
-- **LOW**: minor concrete regression with limited impact.
-
-Merge duplicate findings. After simplification, apply the smallest correction only to regressions it introduced; report pre-existing bugs without edits. In `--review`-only mode, report without any fixes. Generic preferences and missing tests alone are not defects. When intent is ambiguous, stop or record the assumption instead of guessing.
-
-### 6. Verify the final state
-
-After editing, including `--simplify`, always perform at least the diff and behavior-parity self-check. In `--review`-only mode, use read-only checks without edits or automatic fixes. Apply the following in proportion to impact:
-
-1. Inspect the diff for behavior changes, unrelated files, accidental formatting churn, and contract changes.
-2. Run the narrowest applicable formatter/linter, type checker, targeted tests, and invariant checks.
-3. Run regression guards against regressions the edits themselves could introduce, and confirm the guardrails recorded in §2 are intact. See [verification-and-reporting.md](references/verification-and-reporting.md) for guard patterns.
-4. Broaden validation only when shared contracts, public APIs, build artifacts, or cross-module behavior require it.
-5. Re-check error paths, side effects, async behavior, resource cleanup, and security boundaries when touched.
-6. Name skipped checks and the reason. Never claim a test passed when it was not run.
-
-For small, low-impact changes, report changes/findings, actual verification results, and limitations briefly. Use [verification-and-reporting.md](references/verification-and-reporting.md) for the validation ladder; use its full report template only when impact, complexity, or the user requires it. Use [language-profiles.md](references/language-profiles.md) only for the languages or frameworks actually touched.
-
-## Non-negotiable preservation rules
-
-- Preserve functionality, public contracts, inputs, outputs, errors, side effects, ordering, timing, telemetry, and operational guards. [behavior-parity.md](references/behavior-parity.md) is the authoritative table.
-- Preserve tests and safety fallbacks unless their removal is explicitly requested and independently verified.
-- Treat project configuration and nearby code as stronger evidence than generic best practices.
-- Keep diffs minimal and reviewable. Do not mix simplification with feature changes.
-- If behavior parity cannot be established, or the safe fix requires a redesign or unrequested contract change, stop and report the blocker.
-
-## Completion criteria
-
-The task is complete only when the scope is fixed, every edit has a reason, behavior evidence is recorded, relevant checks have run, skipped checks are disclosed, and residual risks are named. If no safe improvement exists, report a verified no-op with the checks performed.
+Load only what the current change needs: [local transformations](references/simplification-rules.md), [language pitfalls](references/language-profiles.md), [risk-specific review](references/review-profiles.md), or [scope details](references/scope-and-context.md). [Sources](references/sources.md) records provenance, not execution steps.

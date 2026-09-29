@@ -14,12 +14,12 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from _handoff_common import force_utf8_console, read_handoff_config
+from _handoff_common import force_utf8_console, read_handoff_config, report_path
 from _handoff_documents import BASE_DOCS, TOPIC_DOCS, LEGACY_DOCS, conditional_docs
 
 ROOT = Path.cwd()
 DOC_DIR = ROOT / "ProjectDoc"
-REPORT_PATH = DOC_DIR / "analysis-report.json"
+REPORT_PATH = report_path(DOC_DIR)
 CONFIG_PATH = ROOT / ".handoff.yml"
 
 # 门禁强制要求的文档（verify_handoff.py REQUIRED_DOCS），计划中不得跳过
@@ -43,7 +43,7 @@ FOCUS = {
 
 def load_report() -> dict:
     if not REPORT_PATH.exists():
-        raise SystemExit("ERROR: 缺少 ProjectDoc/analysis-report.json，请先运行 analyze_project.py")
+        raise SystemExit("ERROR: 缺少 ProjectDoc/.handoff/analysis-report.json，请先运行 analyze_project.py")
     return json.loads(REPORT_PATH.read_text(encoding="utf-8"))
 
 

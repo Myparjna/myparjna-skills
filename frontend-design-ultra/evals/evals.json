@@ -1,0 +1,78 @@
+{
+  "skill_name": "frontend-design-ultra",
+  "evals": [
+    {
+      "id": 1,
+      "name": "respect-existing-system",
+      "prompt": "项目已使用 Element Plus 和既有的蓝色主题，请在订单列表页新增一个“导出”按钮和导出进度提示。",
+      "expected_output": "沿用 Element Plus 组件与现有主题变量，仅新增按钮与进度提示，不重设计页面。",
+      "files": [],
+      "expectations": [
+        "未更改现有配色、字体与页面结构",
+        "按钮使用组件库现有样式与尺寸",
+        "导出过程提供 loading 与失败重试"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "workbench-not-landing",
+      "prompt": "为仓库管理员设计一个库存盘点工作台，桌面端使用，需要筛选、批量核对和查看差异详情。",
+      "expected_output": "判定为桌面工作台，采用筛选区＋表格＋详情面板结构，信息密度适中，不使用 Hero 与营销式版式。",
+      "files": [],
+      "expectations": [
+        "方向合同中 MODE 为桌面工作台",
+        "比较多条记录时使用表格而非卡片堆",
+        "无居中 Hero、大面积渐变或营销文案"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "a-level-defects",
+      "prompt": "做一个移动端 H5 的报修提交页，包含问题类型、描述、图片上传和提交。",
+      "expected_output": "所有按钮均有实际行为，图标来自同一主流图标库，不使用 emoji 图标，声明 viewport，表单 label 位于输入框上方。",
+      "files": [],
+      "expectations": [
+        "不存在无响应的死按钮",
+        "不使用 emoji 充当图标",
+        "包含 viewport meta 与 lang=zh-CN",
+        "提交失败时保留已填写内容并提供重试"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "static-status-indicator",
+      "prompt": "设计设备监控列表，每台设备显示在线、离线或告警状态。",
+      "expected_output": "状态以静态颜色、形状与文字表达，不使用循环闪烁或呼吸动画。",
+      "files": [],
+      "expectations": [
+        "在线状态点不闪烁、不呼吸",
+        "状态同时使用颜色与文字或图标表达",
+        "循环动效仅用于加载过程"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "favicon-and-title",
+      "prompt": "新建一个团队周报查看站点首页。",
+      "expected_output": "配置可识别的 favicon 与可区分的页面标题，无品牌素材时生成本地 SVG 图标。",
+      "files": [],
+      "expectations": [
+        "页面包含 favicon 声明",
+        "title 能与其他项目区分",
+        "未使用浏览器默认图标"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "b-level-justification",
+      "prompt": "为一家独立咖啡烘焙品牌做官网落地页，用户未指定风格。",
+      "expected_output": "若采用居中 Hero、三等分卡片或米色衬线等 B 级风格，需写出保留理由；写不出理由时改用其他方案。",
+      "files": [],
+      "expectations": [
+        "方向合同中 WORLD 写出具体取材来源",
+        "每个命中的 B 级风险都附一句保留理由",
+        "色板与字体可由 WORLD 推导"
+      ]
+    }
+  ]
+}

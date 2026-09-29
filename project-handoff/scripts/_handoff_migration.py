@@ -26,7 +26,8 @@ def migrate_legacy_docs(directory):
     for source in sorted(sources):
         target = directory / LEGACY_DOCS[source.name.lower()]
         original = target.read_text(encoding='utf-8') if target.exists() else '# 交接说明\n'
-        addition = body_only(source.read_text(encoding='utf-8'))
+        from _handoff_common import read_text_lenient
+        addition = body_only(read_text_lenient(source))
         target.write_text(original.rstrip() + f'\n\n## 历史内容（来自 {source.name}）\n\n' + addition + '\n', encoding='utf-8')
         source.unlink()
     pattern = re.compile(r'(?P<prefix>\]\(<?(?:\./)?|^\s*\[[^]\n]+\]:\s*<?(?:\./)?)(?P<name>[A-Za-z-]+\.md)(?=[#)>\s]|$)', re.M)
