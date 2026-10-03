@@ -14,7 +14,7 @@
 | `harmony-os-ux-guide` | 基于华为官方 UX 设计指南整理的 163 篇设计参考：设计原则、组件、布局、交互、多设备适配、动效与行业案例；v1.2.0 已合入官方 2026 更新批次（沉浸光感、圆角/间隔参数、隔空手势、智能座舱专题等） | ~3.7 MB |
 | `modelscope-search` | 魔搭社区 ModelScope 模型搜索（200K+ 模型，按下载量/收藏排序） | ~12 KB |
 | `see-tools` | S.E.E 短网址 / 文本分享 / 图床工具（仅显式授权时调用） | ~7 KB |
-| `skillsmp-search` | Myparjna 自研的技能搜索工具，通过 SkillsMP API 检索可安装的 AI Skills | ~18 KB |
+| `skillsmp-search` | SkillsMP 技能市场搜索 | ~18 KB |
 
 ## 安装
 

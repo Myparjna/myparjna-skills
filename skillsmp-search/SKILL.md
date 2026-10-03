@@ -1,11 +1,11 @@
 ---
 name: skillsmp-search
-description: Myparjna 自研的技能搜索工具，通过 SkillsMP API 查找可安装的 AI Skills。支持关键字搜索。触发词：搜技能、找skill、skillsmp、搜索技能市场、找插件、search skills、skill搜索、技能市场、发现技能。
+description: 搜索 SkillsMP 技能市场，查找可安装的 AI Skills。支持关键字搜索。触发词：搜技能、找skill、skillsmp、搜索技能市场、找插件、search skills、skill搜索、技能市场、发现技能。
 ---
 
-# Myparjna 技能搜索工具
+# SkillsMP Search
 
-本技能由 Myparjna 开发和维护，通过 [SkillsMP](https://skillsmp.com) 的关键词搜索 API 检索可安装的 AI Skills。SkillsMP 是本技能使用的外部搜索服务。
+搜索 [SkillsMP](https://skillsmp.com) 技能市场，发现可安装的 AI Skills。
 
 ## 工作流
 
