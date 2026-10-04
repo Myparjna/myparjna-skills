@@ -1,81 +1,42 @@
 ---
 name: modelscope-search
-description: "用户提到 魔搭、ModelScope、搜模型、找模型、模型对比、模型下载 时必须使用本技能。在 ModelScope（魔搭社区）搜索 AI 模型，覆盖 OCR、NLP、CV、语音等方向，支持关键词搜索与按下载量、收藏排序。"
+description: "在 ModelScope（魔搭社区）搜索 AI 模型并查看详情，覆盖 OCR、NLP、CV、语音等方向，支持按下载量或收藏排序。用户提到魔搭、ModelScope、搜模型、找模型、模型对比或模型下载时使用。"
 ---
 
-# ModelScope Model Search
+# ModelScope 模型搜索
 
-Search and discover AI models on [ModelScope](https://modelscope.cn) — China's largest open-source model platform with 200K+ models.
+## 前置条件
 
-## When to Use
+- Python 3.9+，依赖 `requests`（`uv pip install requests`）。
+- 下载模型需另行安装 ModelScope SDK：`uv pip install modelscope`（要求 Python 3.10+）。
 
-- User asks to find models on ModelScope (e.g., "search OCR models on 魔搭")
-- User wants to compare models for a specific task
-- User needs model IDs for downloading via `modelscope download`
-- User asks "what models are available for X on ModelScope"
-
-## Prerequisites
-
-- Python 3.9+（脚本使用 `list[dict]`；当前 PyPI ModelScope SDK 另要求 Python 3.10+）
-- `requests` library (`uv pip install requests`)
-- **仅搜索功能**：不需要安装 modelscope CLI，搜索脚本只依赖 `requests`
-- **下载模型**（搜索后的下一步）：需要 `pip install modelscope`
-
-## Commands
-
-### Basic Search
+## 命令
 
 ```bash
-python <skill_dir>/scripts/search_models.py "OCR"
+python <skill_dir>/scripts/search_models.py "OCR"                      # 关键词搜索，默认按下载量排序
+python <skill_dir>/scripts/search_models.py "OCR" --sort stars         # 按收藏排序
+python <skill_dir>/scripts/search_models.py "Qwen" --limit 5 --page 2  # 数量 1..100，页码 >= 1
+python <skill_dir>/scripts/search_models.py "OCR" --json               # JSON 输出
+python <skill_dir>/scripts/search_models.py --model PaddlePaddle/PaddleOCR-VL  # 模型详情
 ```
 
-### Sort by Downloads (default) or Stars
+## 输出字段
 
-```bash
-python <skill_dir>/scripts/search_models.py "OCR" --sort downloads
-python <skill_dir>/scripts/search_models.py "OCR" --sort stars
-```
+| 字段 | 说明 |
+|------|------|
+| `path` | `org/model-name`，可直接用于 `modelscope download --model` |
+| `downloads` / `stars` | 下载量 / 收藏数 |
+| `license` | 许可证 |
+| `tags` / `tasks` | 标签 / 支持任务 |
 
-### Limit Results
+## 工作流
 
-```bash
-python <skill_dir>/scripts/search_models.py "Qwen" --limit 5
-```
+1. 搜索：`python search_models.py "OCR" --limit 10`
+2. 从结果中选定模型，例如 `deepseek-ai/DeepSeek-OCR`
+3. 下载：`modelscope download --model 'deepseek-ai/DeepSeek-OCR' --local_dir ./models`
 
-### JSON Output (for Agent parsing)
+## 说明
 
-```bash
-python <skill_dir>/scripts/search_models.py "OCR" --limit 10 --json
-```
-
-### Get Model Details
-
-```bash
-python <skill_dir>/scripts/search_models.py --model PaddlePaddle/PaddleOCR-VL
-```
-
-## Output Fields
-
-| Field | Description |
-|-------|-------------|
-| `path` | `org/model-name` format, usable directly with `modelscope download --model` |
-| `downloads` | Total download count |
-| `stars` | Community stars |
-| `license` | License type (MIT, Apache-2.0, etc.) |
-| `tags` | Model tags (e.g., ocr, vision, nlp) |
-| `tasks` | Supported tasks |
-
-## Example Workflow
-
-1. Search: `python search_models.py "OCR" --limit 10`
-2. Pick a model from results (e.g., `deepseek-ai/DeepSeek-OCR`)
-3. Download: `modelscope download --model 'deepseek-ai/DeepSeek-OCR' --local_dir ./models`
-
-## Notes
-
-- The search API uses an undocumented ModelScope endpoint discovered via SDK source analysis
-- Results are sorted only within the fetched API page, NOT globally. Fetch size is min(limit × 2, 100); `--page` selects that API page. `--page >= 1`, `--limit 1..100`. JSON reports `sort_scope`, `page`, `page_size`, and `fetched`.
-- Search calls the HTTP API directly through requests, not the SDK or CLI. Detail uses exact `GET /api/v1/models/{org}/{name}`, verified against official SDK v1.37.1 `HubApi.get_model(revision=None)`.
-- Request failures emit a stable JSON error on stderr and exit 1; argparse errors exit 2.
-- Search is fuzzy matching on model name
-- See `references/api-notes.md` for API details
+- 搜索按模型名模糊匹配；排序仅在当前抓取页内进行，抓取量为 min(limit × 2, 100)，JSON 中的 `sort_scope`、`page`、`page_size`、`fetched` 字段标明范围。
+- 请求失败时 stderr 输出 JSON 错误并退出 1；参数错误退出 2。
+- 接口细节见 `references/api-notes.md`。
