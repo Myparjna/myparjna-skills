@@ -272,13 +272,3 @@ h1 { font-family: 'Monu YueDong', serif; }
 ```css
 h1 { font-family: 'ZT YueDongHei', serif; }
 ```
-
----
-
-## 已移除
-
-### 快看世界体
-
-- 原 CDN 已失效
-- 暂未找到可替代 WebFont CDN
-- 已从 skill 中移除
