@@ -18,10 +18,6 @@ if sys.platform == "win32":
 API_BASE = "https://skillsmp.com/api/v1/skills"
 CONFIG_PATH = Path(os.environ.get("APPDATA", Path.home() / ".config")) / "skillsmp-search" / "config.json"
 
-# ⚠️ 本地默认凭据：仅限本机使用。
-# 上传 GitHub 或其他公开仓库前，必须先运行 scripts/check-secrets.py 并移除该值。
-DEFAULT_API_KEY = ""  # 上传版置空；本机开发版保留，改用环境变量或 config.json
-
 
 def get_api_key():
     key = os.environ.get("SKILLSMP_API_KEY", "").strip()
@@ -36,8 +32,6 @@ def get_api_key():
         pass
     except (OSError, ValueError):
         raise RuntimeError("Invalid local credential configuration") from None
-    if DEFAULT_API_KEY:
-        return DEFAULT_API_KEY
     raise RuntimeError("Set SKILLSMP_API_KEY or configure " + str(CONFIG_PATH))
 
 

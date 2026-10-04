@@ -47,7 +47,7 @@ def main() -> int:
         print("发现内嵌密钥，上传 GitHub 前必须移除：", file=sys.stderr)
         for hit in all_hits:
             print(f"  {hit}", file=sys.stderr)
-        print("处理方式：删除 DEFAULT_API_KEY 值，改用环境变量 SKILLSMP_API_KEY 或"
+        print("处理方式：删除内嵌密钥，改用环境变量 SKILLSMP_API_KEY 或"
               " %APPDATA%\\skillsmp-search\\config.json", file=sys.stderr)
         return 1
     print("未发现内嵌密钥，可以上传。")
