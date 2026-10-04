@@ -30,8 +30,7 @@
 - [行为保持](references/behavior-parity.md)：容易遗漏的等价性要求。
 - [评估场景](evals/evals.json)：局部精简、动态消费者、文字候选和测试检查取舍。
 
-范围快照脚本仅辅助记录差异，使用限制见 [范围说明](references/scope-and-context.md)。技能不依赖其他技能、可视化工具或独立评审代理。执行速度和令牌节省需实测，文档缩短不代表运行性能已提升。
-
+范围快照脚本仅辅助记录差异，使用限制见 [范围说明](references/scope-and-context.md)。技能不依赖其他技能、可视化工具或独立评审代理。
 ## 来源
 
 本次融合 [tt-a1i/simplify-codebase](https://github.com/tt-a1i/simplify-codebase) 和 [mattpocock/skills](https://github.com/mattpocock/skills) 的架构普查、模块设计、设计追问与领域建模方法。固定版本和适配差异见来源记录。
